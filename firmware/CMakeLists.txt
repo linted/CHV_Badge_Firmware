@@ -1,9 +1,10 @@
 
 add_executable(
-    firmware 
-    firmware.c
+    rp1_firmware 
+    rp1_firmware.c
 )
 
 target_link_libraries(
-    firmware PUBLIC pico_stdlib can2040
+    rp1_firmware PUBLIC pico_stdlib can2040
 )
+pico_add_extra_outputs(rp1_firmware)
