@@ -5,5 +5,5 @@ add_executable(
 )
 
 target_link_libraries(verify PUBLIC pico_stdlib)
-pico_add_extra_outputs(blink)
-example_auto_set_url(blink)
+pico_add_extra_outputs(verify)
+# example_auto_set_url(verify)
