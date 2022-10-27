@@ -21,7 +21,22 @@ This should contain any unit tests or similar items.
 ## Deps
 Any source code dependencies needed to build the project
 
-_*NOTE:*_ Run the following command to fetch the dependencies.
+# Requirments
+You will need the following packages installed
+```
+gcc-arm-none-eabi
+cmake
+```
+
+# Building
+
+_*NOTE:*_ Run the following command to fetch git the dependencies.
 ```
 git submodule update --init --recursive
 ```
+
+To build run:
+```
+./build.sh
+```
+
