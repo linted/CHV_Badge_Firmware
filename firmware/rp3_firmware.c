@@ -43,8 +43,6 @@ canbus_setup(void)
 int main() {
     canbus_setup();
 
-    
-
     while (1)
     {
         struct can2040_msg msg = {

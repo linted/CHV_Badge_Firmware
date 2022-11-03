@@ -4,12 +4,25 @@
 #define CAN_RX 4; //TODO: change to correct pins
 #define CAN_TX 5; //TODO: change to correct pins
 
-static struct can2040 cbus;
+static struct can2040 cbus = {0}; // zero init
+const unsigned int LEDs[] = {5,6,7,10,11};
+bool Led_Status[5] = {0};
 
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 {
-    // Add message processing code here...
+    if (notify == CAN2040_NOTIFY_RX)
+    {
+        // we got a message!
+        if (msg->id == 1) {
+            // it's a message from RP1!
+            // flip the light they said
+            Led_In_Message = msg->data[0] % sizeof(Led_Status);
+            Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
+            gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
+        }
+    }
+    
 }
 
 static void
@@ -43,20 +56,24 @@ canbus_setup(void)
 int main() {
     canbus_setup();
 
-    
+    for(int i =0; i < (sizeof(LEDs)/sizeof(LEDs[0])); i++) {
+        gpio_init(LEDs[i]);
+        gpio_set_dir(LEDs[i], GPIO_OUT);
+    }
 
+    uint8_t counter = 0;
     while (1)
     {
         struct can2040_msg msg = {
-            .id = 1,
+            .id = 2,
             .dlc = 1,
-            .data32 = {
-                0xffffffff, 
-                0xffffffff
+            .data = {
+                counter
             }
         }
         can2040_transmit(&cbus, &msg);
         sleep_ms(1000);
+        counter = (counter + 1) % UINT8_MAX;
     }
     
 }
