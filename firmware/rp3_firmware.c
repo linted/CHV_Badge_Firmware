@@ -1,3 +1,4 @@
+#include <RP2040.h>
 #include <pico/stdlib.h>
 #include <can2040.h>
 #include <pico/util/queue.h>
@@ -27,7 +28,7 @@ void
 canbus_setup(void)
 {
     uint32_t pio_num = 0;
-    uint32_t sys_clock = 125000000
+    uint32_t sys_clock = 125000000;
     uint32_t bitrate = 500000;
     uint32_t gpio_rx = CAN_RX;
     uint32_t gpio_tx = CAN_TX;
@@ -53,9 +54,9 @@ int main() {
     while (1)
     {
         queue_remove_blocking(&recv_queue, &msg);
-        if (msg->id == 2)
+        if (msg.id == 2)
         {
-            Led_In_Message = msg->data[0] % sizeof(Led_Status);
+            uint8_t Led_In_Message = msg.data[0] % sizeof(Led_Status);
             Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
             gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
         }
@@ -67,7 +68,7 @@ int main() {
                 0xdeadbeef,
                 0xc0ffee
             }
-        }
+        };
         can2040_transmit(&cbus, &msg);
     }
     

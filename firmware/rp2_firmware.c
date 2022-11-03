@@ -1,3 +1,4 @@
+#include <RP2040.h>
 #include <pico/stdlib.h>
 #include <can2040.h>
 
@@ -17,7 +18,7 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
         if (msg->id == 1) {
             // it's a message from RP1!
             // flip the light they said
-            Led_In_Message = msg->data[0] % sizeof(Led_Status);
+            uint8_t Led_In_Message = msg->data[0] % sizeof(Led_Status);
             Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
             gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
         }
@@ -35,7 +36,7 @@ void
 canbus_setup(void)
 {
     uint32_t pio_num = 0;
-    uint32_t sys_clock = 125000000
+    uint32_t sys_clock = 125000000;
     uint32_t bitrate = 500000;
     uint32_t gpio_rx = CAN_RX;
     uint32_t gpio_tx = CAN_TX;
@@ -70,7 +71,7 @@ int main() {
             .data = {
                 counter
             }
-        }
+        };
         can2040_transmit(&cbus, &msg);
         sleep_ms(1000);
         counter = (counter + 1) % UINT8_MAX;

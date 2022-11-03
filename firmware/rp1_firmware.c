@@ -1,3 +1,4 @@
+#include <RP2040.h>
 #include <pico/stdlib.h>
 #include <can2040.h>
 
@@ -22,7 +23,7 @@ void
 canbus_setup(void)
 {
     uint32_t pio_num = 0;
-    uint32_t sys_clock = 125000000
+    uint32_t sys_clock = 125000000;
     uint32_t bitrate = 500000;
     uint32_t gpio_rx = CAN_RX;
     uint32_t gpio_tx = CAN_TX;
@@ -54,7 +55,7 @@ int main() {
                 0xffffffff, 
                 0xffffffff
             }
-        }
+        };
         can2040_transmit(&cbus, &msg);
         sleep_ms(1000);
     }
