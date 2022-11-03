@@ -1,15 +1,19 @@
 #include <pico/stdlib.h>
 #include <can2040.h>
+#include <pico/util/queue.h>
 
-#define CAN_RX 4; //TODO: change to correct pins
-#define CAN_TX 5; //TODO: change to correct pins
+#define CAN_RX 17;
+#define CAN_TX 16;
 
 static struct can2040 cbus;
+const unsigned int LEDs[] = {5,6,7,10,11};
+bool Led_Status[5] = {0};
+queue_t recv_queue;
 
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 {
-    // Add message processing code here...
+    queue_try_add(&recv_queue, msg); // add the msg to the queue
 }
 
 static void
@@ -17,6 +21,7 @@ PIOx_IRQHandler(void)
 {
     can2040_pio_irq_handler(&cbus);
 }
+
 
 void
 canbus_setup(void)
@@ -41,20 +46,29 @@ canbus_setup(void)
 }
 
 int main() {
+    queue_init(&recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
     canbus_setup();
 
+    struct can2040_msg msg;
     while (1)
     {
-        struct can2040_msg msg = {
-            .id = 1,
+        queue_remove_blocking(&recv_queue, &msg);
+        if (msg->id == 2)
+        {
+            Led_In_Message = msg->data[0] % sizeof(Led_Status);
+            Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
+            gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
+        }
+        
+        struct can2040_msg response = {
+            .id = 3,
             .dlc = 1,
             .data32 = {
-                0xffffffff, 
-                0xffffffff
+                0xdeadbeef,
+                0xc0ffee
             }
         }
         can2040_transmit(&cbus, &msg);
-        sleep_ms(1000);
     }
     
 }

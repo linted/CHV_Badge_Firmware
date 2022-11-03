@@ -1,8 +1,8 @@
 #include <pico/stdlib.h>
 #include <can2040.h>
 
-#define CAN_RX 4; //TODO: change to correct pins
-#define CAN_TX 5; //TODO: change to correct pins
+#define CAN_RX 17;
+#define CAN_TX 16;
 
 static struct can2040 cbus;
 

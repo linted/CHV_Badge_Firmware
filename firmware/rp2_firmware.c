@@ -1,10 +1,10 @@
 #include <pico/stdlib.h>
 #include <can2040.h>
 
-#define CAN_RX 4; //TODO: change to correct pins
-#define CAN_TX 5; //TODO: change to correct pins
+#define CAN_RX 17;
+#define CAN_TX 16;
 
-static struct can2040 cbus = {0}; // zero init
+static struct can2040 cbus;
 const unsigned int LEDs[] = {5,6,7,10,11};
 bool Led_Status[5] = {0};
 
