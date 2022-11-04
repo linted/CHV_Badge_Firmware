@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [[ "${0,,}" == "clean" ]]; then 
+  rm -rf build/
+fi
+
 MISSING_DEPS=0
 if [ ! $(which cmake) ]; then
   echo "Missing cmake!"

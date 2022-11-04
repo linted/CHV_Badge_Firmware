@@ -40,3 +40,7 @@ To build run:
 ./build.sh
 ```
 
+You can rebuild cleanly by running:
+```
+./build.sh clean
+```
