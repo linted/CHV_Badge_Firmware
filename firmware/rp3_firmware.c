@@ -3,6 +3,7 @@
 #include <can2040.h>
 #include <pico/util/queue.h>
 #include <pico/multicore.h>
+#include <pico/printf.h>
 
 #define CAN_RX 17;
 #define CAN_TX 16;
@@ -38,6 +39,20 @@ can_msg_handler(void)
             Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
             gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
         }
+        
+        // TODO: make sure dlc is less then 8??? ...nah
+        // now print the can msg we got
+        // T - extended can msg
+        // %08X - 8 hex character msg id
+        // %01u - 1 character for the dlc
+        printf("T%08X%01u" , msg.id, msg.dlc);
+        for(int i=0; i < msg.dlc; i++)
+        {
+            // %02X - 2 hex chars for each data byte
+            printf("%02X", msg.data[i]);
+        }
+        printf("\r");
+        stdio_flush();
     }
 }
 
@@ -66,6 +81,8 @@ canbus_setup(void)
 int main() {
     queue_init(&recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
     canbus_setup();
+    // stdio_init_all();
+    stdio_usb_init();
 
     for(int i =0; i < (sizeof(LEDs)/sizeof(LEDs[0])); i++) {
         gpio_init(LEDs[i]);
@@ -78,13 +95,19 @@ int main() {
     {   
         struct can2040_msg response = {
             .id = 3,
-            .dlc = 1,
-            .data32 = {
-                0xdeadbeef,
-                0xc0ffee
+            .dlc = 8,
+            .data = {
+                0xde,
+                0xad,
+                0xbe,
+                0xef,
+                0x00,
+                0xc0,
+                0xff,
+                0xee
             }
         };
-        can2040_transmit(&cbus, &msg);
+        can2040_transmit(&cbus, &response);
         sleep_ms(1000);
     }
     

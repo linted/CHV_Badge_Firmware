@@ -44,3 +44,13 @@ You can rebuild cleanly by running:
 ```
 ./build.sh clean
 ```
+
+# cansniffer
+rp3 is set up to log output in a format readable by socketcan.
+Run the following commands to get everything setup.
+
+```
+sudo slcand /dev/ttyACM0
+sudo ip link set slcan0 up
+cansniffer slcan0
+```
