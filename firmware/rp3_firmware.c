@@ -2,6 +2,7 @@
 #include <pico/stdlib.h>
 #include <can2040.h>
 #include <pico/util/queue.h>
+#include <pico/multicore.h>
 
 #define CAN_RX 17;
 #define CAN_TX 16;
@@ -23,6 +24,22 @@ PIOx_IRQHandler(void)
     can2040_pio_irq_handler(&cbus);
 }
 
+static void
+can_msg_handler(void) 
+{
+    struct can2040_msg msg;
+
+    while (1)
+    {
+        queue_remove_blocking(&recv_queue, &msg);
+        if (msg.id == 2)
+        {
+            uint8_t Led_In_Message = msg.data[0] % sizeof(Led_Status);
+            Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
+            gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
+        }
+    }
+}
 
 void
 canbus_setup(void)
@@ -50,17 +67,15 @@ int main() {
     queue_init(&recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
     canbus_setup();
 
-    struct can2040_msg msg;
+    for(int i =0; i < (sizeof(LEDs)/sizeof(LEDs[0])); i++) {
+        gpio_init(LEDs[i]);
+        gpio_set_dir(LEDs[i], GPIO_OUT);
+    }
+
+    multicore_launch_core1(can_msg_handler);
+
     while (1)
-    {
-        queue_remove_blocking(&recv_queue, &msg);
-        if (msg.id == 2)
-        {
-            uint8_t Led_In_Message = msg.data[0] % sizeof(Led_Status);
-            Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
-            gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
-        }
-        
+    {   
         struct can2040_msg response = {
             .id = 3,
             .dlc = 1,
@@ -70,6 +85,7 @@ int main() {
             }
         };
         can2040_transmit(&cbus, &msg);
+        sleep_ms(1000);
     }
     
 }
