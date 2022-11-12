@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ "${0,,}" == "clean" ]]; then 
-  rm -rf build/
+if [[ "${1,,}" == "clean" ]]; then 
+  rm -rf build/ release/
 fi
 
 MISSING_DEPS=0
@@ -13,15 +13,19 @@ if [ ! $(which arm-none-eabi-gcc) ]; then
   echo "missing arm gcc!"
   MISSING_DEPS=1
 fi
+if [ $(python3 -c "from elftools.elf import elffile") ]; then
+  echo "missing elftools!"
+  MISSING_DEPS=1
+fi
 
-if [ ! $MISSING_DEPS ]; then
+if [ $MISSING_DEPS -eq 1 ]; then
   exit 1
 fi
 
 pushd $(dirname -- "${BASH_SOURCE[0]}")
   mkdir -p build
   pushd build
-    cmake ..
-    make -j4
+    cmake .. -DCMAKE_INSTALL_PREFIX=$(pwd)/../release
+    make -j4 install
   popd
 popd

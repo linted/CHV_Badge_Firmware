@@ -4,3 +4,6 @@
 [submodule "deps/pico-sdk"]
 	path = deps/pico-sdk
 	url = ../../raspberrypi/pico-sdk
+[submodule "deps/micropython"]
+	path = deps/micropython
+	url = ../../micropython/micropython.git

@@ -28,6 +28,14 @@ gcc-arm-none-eabi
 cmake
 ```
 
+## elftools
+install elftools with:
+```
+pip install 'pyelftools>=0.25'
+```
+
+
+
 # Building
 
 _*NOTE:*_ Run the following command to fetch git the dependencies.
