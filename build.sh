@@ -25,7 +25,8 @@ fi
 pushd $(dirname -- "${BASH_SOURCE[0]}")
   mkdir -p build
   pushd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=$(pwd)/../release
-    make -j4 install
+    # cmake .. -DCMAKE_INSTALL_PREFIX=$(pwd)/../release
+    cmake ../deps/micropython/ports/rp2 -DUSER_C_MODULES=$(pwd)/../CMakeLists.txt
+    cmake --build . -j4
   popd
 popd
