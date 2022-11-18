@@ -22,6 +22,10 @@ if [ $MISSING_DEPS -eq 1 ]; then
   exit 1
 fi
 
+pushd deps/micropython/ports/rp2
+  make submodules
+popd
+
 pushd $(dirname -- "${BASH_SOURCE[0]}")
   mkdir -p build
   pushd build
