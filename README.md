@@ -40,7 +40,7 @@ pip install 'pyelftools>=0.25'
 
 _*NOTE:*_ Run the following command to fetch git the dependencies.
 ```
-git submodule update --init --recursive
+git submodule update --init
 ```
 
 To build run:
