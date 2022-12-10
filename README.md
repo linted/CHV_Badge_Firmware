@@ -6,6 +6,8 @@ This project is intended to provide firmware for emulating a car on a single PCB
 /
 └─── verification/
 └─── firmware/
+    └─── c
+    └─── py
 └─── tests/
 └─── deps/
 ```
@@ -13,7 +15,9 @@ This project is intended to provide firmware for emulating a car on a single PCB
 Files in this folder are for use by manufacturer to verify that all electrical connections are correct.
 
 ## Firmware
-Firmware folder contains the firmware which actually emulates the car
+Firmware folder contains the firmware which actually emulates the car.
+
+Each language subfolder is dedicated to implementations for those langages. For example, the py folder contains the required integrations and code to run the emulation in python.
 
 ## Tests
 This should contain any unit tests or similar items.
