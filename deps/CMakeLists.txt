@@ -7,8 +7,14 @@ add_library(
     can2040 STATIC
     can2040/src/can2040.c
 )
-target_include_directories(can2040 PUBLIC can2040/src/)
+target_include_directories(can2040 PUBLIC ${CMAKE_CURRENT_LIST_DIR}/can2040/src/)
 target_link_libraries(can2040 PUBLIC pico_stdlib cmsis_core)
+
+add_library(
+    can2040_interface INTERFACE
+    can2040/src/can2040.c
+)
+target_include_directories(can2040_interface INTERFACE ${CMAKE_CURRENT_LIST_DIR}/can2040/src/)
 
 ########### MicroPython stuff ###########
 set(MP_DIR "${CMAKE_CURRENT_LIST_DIR}/micropython" CACHE STRING "" )
@@ -46,7 +52,7 @@ function(add_mpy_py TARGET FILE)
     )
 
     add_custom_target(
-        ${TARGET} ALL 
+        ${TARGET} ALL
         DEPENDS ${output_file}
     )
     install(FILES ${output_file} DESTINATION ${INSTALL_DIR})
@@ -57,24 +63,24 @@ function(add_mpy_c_module TARGET)
 
     set(MUTLI_VALUE_ARGS SRC INCLUDE DEPS)
     cmake_parse_arguments(PARSE_ARGV 1 MPY_C "" "" "${MUTLI_VALUE_ARGS}")
-    
+
     add_library(
         ${TARGET} INTERFACE
     )
 
-    target_sources( 
+    target_sources(
         ${TARGET} INTERFACE
         ${MPY_C_SRC}
     )
 
     if(NOT "${MPY_C_INCLUDE}" STREQUAL "" )
         target_include_directories(
-            ${TARGET}
+            ${TARGET} INTERFACE
             ${MPY_C_INCLUDE}
         )
     endif()
 
-    target_link_libraries(${TARGET} PRIVATE ${DEPS})
+    target_link_libraries(${TARGET} INTERFACE ${MPY_C_DEPS})
 
     target_link_libraries(usermod INTERFACE ${TARGET})
 
