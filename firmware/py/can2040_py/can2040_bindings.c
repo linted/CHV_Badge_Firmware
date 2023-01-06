@@ -3,7 +3,7 @@ void test(void)
     return;
 }
 
-'''
+/*
 
 #include "py/runtime.h"
 
@@ -126,4 +126,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 // Register the module 'can' and make it available in Python
 MP_REGISTER_MODULE(MP_QSTR_can, can_cmodule);
 
-'''
+*/
