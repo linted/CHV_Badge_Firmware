@@ -1,13 +1,20 @@
-void test(void)
-{
-    return;
-}
+
+// Include MicroPython API.
+#include "py/runtime.h"
+
+#include <RP2040.h>
+#include <can2040.h>
+
+
+// void test(void)
+// {
+//     return;
+// }
 
 /*
 
 #include "py/runtime.h"
 
-#include <RP2040.h>
 #include <pico/stdlib.h>
 #include <pico/util/queue.h>
 #include <pico/multicore.h>
@@ -97,33 +104,40 @@ STATIC mp_obj_t can_make_new(const mp_objtype_t *type, size_t n_args, size_t n_k
     return MP_OBJ_FROM_PTR(self);
 }
 
-STATIC mp_obj_t mp_can_send(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    return();
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_send_obj, 1 , mp_can_send);
 
 STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     return();
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_recv_obj, 1 , mp_can_recv);
 
-STATIC const mp_rom_map_elem_t can_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&canbus_init_obj)}
-    { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&canbus_send_obj) },
-    { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
-};
-STATIC MP_DEFINE_CONST_DICT(can_module_globals, can_module_globals_table)
+*/
 
-MP_DEFINE_CONST_OBJ_TYPE(
-    pyb_caniface_tpye,
-    MP_QSTR_CANIFACE,
-    MP_TYPE_FLAG_NONE,
-    make_new, can_make_new,
-    // print, ???,
-    locals_dict, &can_module_globals
-    );
+STATIC mp_obj_t mp_can_send(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    mp_printf(MICROPY_ERROR_PRINTER, "Just sending things\n");
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_send_obj, 1 , mp_can_send);
+
+// STATIC MP_DEFINE_CONST_OBJ_TYPE(
+//     pyb_caniface_type,
+//     MP_QSTR_CANIFACE,
+//     MP_TYPE_FLAG_NONE,
+//     make_new, can_make_new,
+//     // print, ???,
+//     locals_dict, &can_module_globals
+//     );
+
+STATIC const mp_rom_map_elem_t can_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_QSTR(MP_QSTR_canhack) },
+    { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&canbus_send_obj) }
+    // { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
+};
+STATIC MP_DEFINE_CONST_DICT(can_module_globals, can_module_globals_table);
+
+const mp_obj_module_t mp_module_canhack = {
+    .base = { &mp_type_module },
+    .globals = (mp_obj_dict_t *)&can_module_globals,
+};
 
 // Register the module 'can' and make it available in Python
-MP_REGISTER_MODULE(MP_QSTR_can, can_cmodule);
-
-*/
+MP_REGISTER_MODULE(MP_QSTR_canhack, mp_module_canhack);
