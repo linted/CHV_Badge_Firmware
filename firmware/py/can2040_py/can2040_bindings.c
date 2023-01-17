@@ -7,9 +7,6 @@
 #include <pico/stdlib.h>
 #include <pico/stdio.h>
 #include <pico/util/queue.h>
-// #include <modrp2.h>
-
-// #include <slcan_output.h>
 
 STATIC const mp_obj_type_t mp_caninterface_type;
 
@@ -18,15 +15,6 @@ typedef struct {
     queue_t recv_queue;
     struct can2040 internal;
 } mp_obj_can_interface_t;
-
-// Constants (temporary)
-#define CAN_RX 17;
-#define CAN_TX 16;
-
-#define PIO_NUM 1;
-
-const unsigned int LEDs[] = {5,6,7,10,11};
-bool Led_Status[5] = {0};
 
 // PRIVATE
 // TODO Trying to decide what the best way of initing the device and wether we want to support
@@ -54,12 +42,25 @@ static void PIOx_IRQHandler(void)
 }
 
 STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    uint32_t pio_num = PIO_NUM;
-    uint32_t gpio_rx = CAN_RX;
-    uint32_t gpio_tx = CAN_TX;
+    enum { ARG_bitrate, ARG_sysclock, ARG_gpiorx, ARG_gpiotx, ARG_pionum};
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_bitrate,  MP_ARG_REQUIRED | MP_ARG_INT,   {.u_int = 500000} },
+        { MP_QSTR_sysclock, MP_ARG_INT,   {.u_int = 125000000} },
+        { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 17} },
+        { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 16} },
+        { MP_QSTR_pionum,   MP_ARG_INT,   {.u_int = 1}  },
+    };
 
-    uint32_t sys_clock = 125000000;
-    uint32_t bitrate = 500000;
+    // parse args
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    uint32_t pio_num = args[ARG_pionum].u_int;
+    uint32_t gpio_rx = args[ARG_gpiorx].u_int;
+    uint32_t gpio_tx = args[ARG_gpiotx].u_int;
+
+    uint32_t sys_clock = args[ARG_sysclock].u_int;
+    uint32_t bitrate = args[ARG_bitrate].u_int;
 
     // setup queue and what the hell is the usb thing doing?
     queue_init(&self->recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
@@ -86,21 +87,16 @@ STATIC mp_obj_t mp_can_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mp_can_init_obj, 1 , mp_can_init);
 
 STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
-    // check arguments
-    // mp_arg_check_num(n_args, n_kw, 1, MP_OBJ_FUN_ARGS_MAX, true);
-
     // parse args
     mp_map_t kw_args;
     mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-
 
     // setup the object
     mp_obj_can_interface_t *self = &mp_can_obj_0;
     self->base.type = &mp_caninterface_type;
 
     // Need to setup here and set the PIO interface
-    // rp2_pio_deinit();
-    can_init_helper(self, n_args - 1, all_args + 1, &kw_args);
+    can_init_helper(self, n_args, all_args, &kw_args);
 
     return (mp_obj_t)self;
 }
