@@ -1,16 +1,44 @@
 #include <RP2040.h>
 #include <pico/stdlib.h>
 #include <can2040.h>
+#include <slcan_output.h>
+#include <pico/util/queue.h>
+#include <stdbool.h>
+
 
 #define CAN_RX 17;
 #define CAN_TX 16;
 
 static struct can2040 cbus;
+queue_t recv_queue;
+bool on_off;
 
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 {
+    // if (notify == CAN2040_NOTIFY_RX)
+    {
+        // add the msg to the queue
+        queue_try_add(&recv_queue, msg); 
+    }
+    
+}
+
+static void handle_queue(void)
+{
     // Add message processing code here...
+    struct can2040_msg msg;
+    while (1)
+    {
+        queue_remove_blocking(&recv_queue, &msg);
+        if(msg.id > 0x2)
+        {
+            gpio_put(5, on_off);
+            on_off = !on_off;
+        }
+
+        log_can_message(&msg);
+    }
 }
 
 static void
@@ -42,20 +70,24 @@ canbus_setup(void)
 }
 
 int main() {
+    queue_init(&recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
+    stdio_usb_init();
     canbus_setup();
 
-    
+    gpio_init(5);
+    gpio_set_dir(5, GPIO_OUT);
+    multicore_launch_core1(handle_queue);
 
+    struct can2040_msg msg = {
+        .id = 1,
+        .dlc = 1,
+        .data32 = {
+            0xffffffff, 
+            0xffffffff
+        }
+    };
     while (1)
     {
-        struct can2040_msg msg = {
-            .id = 1,
-            .dlc = 1,
-            .data32 = {
-                0xffffffff, 
-                0xffffffff
-            }
-        };
         can2040_transmit(&cbus, &msg);
         sleep_ms(1000);
     }

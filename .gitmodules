@@ -1,6 +1,6 @@
 [submodule "deps/can2040"]
 	path = deps/can2040
 	url = ../../KevinOConnor/can2040
-[submodule "deps/pico-sdk"]
-	path = deps/pico-sdk
-	url = ../../raspberrypi/pico-sdk
+[submodule "deps/micropython"]
+	path = deps/micropython
+	url = ../../micropython/micropython.git

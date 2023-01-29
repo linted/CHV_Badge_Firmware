@@ -1,9 +1,9 @@
 #include <RP2040.h>
 #include <pico/stdlib.h>
-#include <can2040.h>
 #include <pico/util/queue.h>
 #include <pico/multicore.h>
-#include <pico/printf.h>
+#include <can2040.h>
+#include <slcan_output.h>
 
 #define CAN_RX 17;
 #define CAN_TX 16;
@@ -16,7 +16,11 @@ queue_t recv_queue;
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 {
-    queue_try_add(&recv_queue, msg); // add the msg to the queue
+    if (notify == CAN2040_NOTIFY_RX)
+    {
+        // add the msg to the queue
+        queue_try_add(&recv_queue, msg); 
+    }
 }
 
 static void
@@ -39,20 +43,9 @@ can_msg_handler(void)
             Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
             gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
         }
+
+        log_can_message(&msg);
         
-        // TODO: make sure dlc is less then 8??? ...nah
-        // now print the can msg we got
-        // T - extended can msg
-        // %08X - 8 hex character msg id
-        // %01u - 1 character for the dlc
-        printf("T%08X%01u" , msg.id, msg.dlc);
-        for(int i=0; i < msg.dlc; i++)
-        {
-            // %02X - 2 hex chars for each data byte
-            printf("%02X", msg.data[i]);
-        }
-        printf("\r");
-        stdio_flush();
     }
 }
 
@@ -80,9 +73,8 @@ canbus_setup(void)
 
 int main() {
     queue_init(&recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
-    canbus_setup();
-    // stdio_init_all();
     stdio_usb_init();
+    canbus_setup();
 
     for(int i =0; i < (sizeof(LEDs)/sizeof(LEDs[0])); i++) {
         gpio_init(LEDs[i]);
@@ -91,22 +83,22 @@ int main() {
 
     multicore_launch_core1(can_msg_handler);
 
+    struct can2040_msg response = {
+        .id = 0x1ff & CAN2040_ID_EFF,
+        .dlc = 8,
+        .data = {
+            0xde,
+            0xad,
+            0xbe,
+            0xef,
+            0x00,
+            0xc0,
+            0xff,
+            0xee
+        }
+    };
     while (1)
     {   
-        struct can2040_msg response = {
-            .id = 3,
-            .dlc = 8,
-            .data = {
-                0xde,
-                0xad,
-                0xbe,
-                0xef,
-                0x00,
-                0xc0,
-                0xff,
-                0xee
-            }
-        };
         can2040_transmit(&cbus, &response);
         sleep_ms(1000);
     }
