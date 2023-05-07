@@ -25,12 +25,12 @@ firmware(
     rp1_firmware.c
 )
 
-firmware(
-    rp2_firmware 
-    rp2_firmware.c
-)
+# firmware(
+#     rp2_firmware 
+#     rp2_firmware.c
+# )
 
-firmware(
-    rp3_firmware 
-    rp3_firmware.c
-)
+# firmware(
+#     rp3_firmware 
+#     rp3_firmware.c
+# )
