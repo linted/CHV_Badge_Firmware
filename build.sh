@@ -28,14 +28,17 @@ if [ $(which ccache) ]; then
 fi
 
 pushd deps/micropython/ports/rp2
-  make submodules
+  make BOARD=PICO submodules
 popd
 
 pushd $(dirname -- "${BASH_SOURCE[0]}")
-  mkdir -p build
+  mkdir -p build/ release/
   pushd build
     # cmake .. -DCMAKE_INSTALL_PREFIX=$(pwd)/../release
-    cmake ../deps/micropython/ports/rp2 -DPICO_SDK_PATH_OVERRIDE=$(pwd)/../deps/micropython/lib/pico-sdk -DUSER_C_MODULES=$(pwd)/../CMakeLists.txt $USE_CCACHE
+    echo "HHHHHHHHHHHHHHHHEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEERRRRRRRRRRRRRRRRRRRRREEEEEEEEEEEEEEEEEEEEEEE"
+    echo "-DUSER_C_MODULES=$(pwd)/../CMakeLists.txt" "-DCMAKE_INSTALL_PREFIX=$(realpath $(pwd)/../release)"
+    cmake ../deps/micropython/ports/rp2 "-DPICO_SDK_PATH_OVERRIDE=$(pwd)/../deps/micropython/lib/pico-sdk" "-DUSER_C_MODULES=$(realpath $(pwd)/../CMakeLists.txt)" -DCMAKE_INSTALL_PREFIX=$(realpath $(pwd)/../release) $USE_CCACHE
     cmake --build . -j4
+    cmake --install . 
   popd
 popd

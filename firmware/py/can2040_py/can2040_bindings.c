@@ -46,8 +46,8 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, con
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_bitrate,  MP_ARG_REQUIRED | MP_ARG_INT,   {.u_int = 500000} },
         { MP_QSTR_sysclock, MP_ARG_INT,   {.u_int = 125000000} },
-        { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 17} },
-        { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 16} },
+        { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 11} },
+        { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 12} },
         { MP_QSTR_pionum,   MP_ARG_INT,   {.u_int = 1}  },
     };
 

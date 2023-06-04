@@ -3,15 +3,14 @@
 #include <pico/util/queue.h>
 #include <pico/multicore.h>
 #include <can2040.h>
-#include <slcan_output.h>
 
-#define CAN_RX 17;
-#define CAN_TX 16;
+#define CAN_RX 11;
+#define CAN_TX 12;
 
-static struct can2040 cbus;
-const unsigned int LEDs[] = {5,6,7,10,11};
-bool Led_Status[5] = {0};
-queue_t recv_queue;
+static struct can2040 cbus = {};
+// const unsigned int LEDs[] = {5,6,7,10,11};
+// bool Led_Status[5] = {0};
+queue_t recv_queue = {};
 
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
@@ -19,7 +18,13 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
     if (notify == CAN2040_NOTIFY_RX)
     {
         // add the msg to the queue
-        queue_try_add(&recv_queue, msg); 
+        queue_add_blocking(&recv_queue, msg); 
+    } else if (notify == CAN2040_NOTIFY_TX) {
+        msg->dlc &= CAN2040_NOTIFY_TX;
+        queue_add_blocking(&recv_queue, msg);
+    } else if (notify & CAN2040_NOTIFY_ERROR) {
+        msg->data32[0] = notify;
+        queue_try_add(&recv_queue, msg);
     }
 }
 
@@ -29,25 +34,19 @@ PIOx_IRQHandler(void)
     can2040_pio_irq_handler(&cbus);
 }
 
-static void
-can_msg_handler(void) 
-{
-    struct can2040_msg msg;
+// static void
+// can_msg_handler(void) 
+// {
+//     struct can2040_msg msg;
 
-    while (1)
-    {
-        queue_remove_blocking(&recv_queue, &msg);
-        if (msg.id == 2)
-        {
-            uint8_t Led_In_Message = msg.data[0] % sizeof(Led_Status);
-            Led_Status[Led_In_Message] = !Led_Status[Led_In_Message];
-            gpio_put(LEDs[Led_In_Message], Led_Status[Led_In_Message]);
-        }
+//     while (1)
+//     {
+//         queue_remove_blocking(&recv_queue, &msg);
 
-        log_can_message(&msg);
+//         log_can_message(&msg);
         
-    }
-}
+//     }
+// }
 
 void
 canbus_setup(void)
@@ -76,15 +75,8 @@ int main() {
     stdio_usb_init();
     canbus_setup();
 
-    for(int i =0; i < (sizeof(LEDs)/sizeof(LEDs[0])); i++) {
-        gpio_init(LEDs[i]);
-        gpio_set_dir(LEDs[i], GPIO_OUT);
-    }
-
-    multicore_launch_core1(can_msg_handler);
-
-    struct can2040_msg response = {
-        .id = 0x1ff & CAN2040_ID_EFF,
+    struct can2040_msg msg = {
+        .id = 2 | CAN2040_ID_EFF,
         .dlc = 8,
         .data = {
             0xde,
@@ -97,10 +89,20 @@ int main() {
             0xee
         }
     };
+
+    
+    if (can2040_check_transmit(&cbus)) {
+        can2040_transmit(&cbus, &msg);
+        printf("Transmit Once\n");
+    } else {
+        printf("Not Transmitting!\n");
+    }
+
     while (1)
     {   
-        can2040_transmit(&cbus, &response);
-        sleep_ms(1000);
+        struct can2040_msg response;
+        queue_remove_blocking(&recv_queue, &response);
+        printf("%d|%d|%08X\n", response.id, response.dlc, response.data);
     }
     
 }

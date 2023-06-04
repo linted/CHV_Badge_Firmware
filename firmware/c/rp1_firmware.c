@@ -1,13 +1,12 @@
 #include <RP2040.h>
 #include <pico/stdlib.h>
 #include <can2040.h>
-#include <slcan_output.h>
 #include <pico/util/queue.h>
 #include <stdbool.h>
 
 
-#define CAN_RX 17;
-#define CAN_TX 16;
+#define CAN_RX 11;
+#define CAN_TX 12;
 
 static struct can2040 cbus;
 queue_t recv_queue;
@@ -31,13 +30,14 @@ static void handle_queue(void)
     while (1)
     {
         queue_remove_blocking(&recv_queue, &msg);
-        if(msg.id > 0x2)
-        {
-            gpio_put(5, on_off);
-            on_off = !on_off;
-        }
+        // if(msg.id > 0x2)
+        // {
+            // gpio_put(5, on_off);
+            // on_off = !on_off;
+        // }
 
-        log_can_message(&msg);
+        printf("%d|%d|%08X", msg.id, msg.dlc, msg.data);
+
     }
 }
 
@@ -74,8 +74,8 @@ int main() {
     stdio_usb_init();
     canbus_setup();
 
-    gpio_init(5);
-    gpio_set_dir(5, GPIO_OUT);
+    // gpio_init(5);
+    // gpio_set_dir(5, GPIO_OUT);
     multicore_launch_core1(handle_queue);
 
     struct can2040_msg msg = {
@@ -89,7 +89,7 @@ int main() {
     while (1)
     {
         can2040_transmit(&cbus, &msg);
-        sleep_ms(1000);
+        sleep_ms(10000);
     }
     
 }

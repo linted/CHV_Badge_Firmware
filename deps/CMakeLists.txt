@@ -47,7 +47,7 @@ endfunction()
 
 function(add_mpy_py TARGET FILE)
     check_mpy_cross()
-    set(output_file ${CMAKE_CURRENT_SOURCE_DIR}/${TARGET}.mpy)
+    set(output_file ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.mpy)
     add_custom_command(
         OUTPUT ${output_file}
         COMMAND ${MPY_CROSS} ${FILE} -o ${output_file}
@@ -58,7 +58,7 @@ function(add_mpy_py TARGET FILE)
         ${TARGET} ALL
         DEPENDS ${output_file}
     )
-    install(FILES ${output_file} DESTINATION ${INSTALL_DIR})
+    install(FILES ${output_file} DESTINATION ${CMAKE_INSTALL_PREFIX})
 endfunction()
 
 
