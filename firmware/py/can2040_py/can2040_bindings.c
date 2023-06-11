@@ -1,33 +1,45 @@
 
 // Include MicroPython API.
-#include "py/runtime.h"
+#include <py/runtime.h>
+#include <py/gc.h>
+
 
 #include <RP2040.h>
-#include <can2040.h>
 #include <pico/stdlib.h>
-#include <pico/stdio.h>
-#include <pico/util/queue.h>
+#include <hardware/pio.h>
+#include <can2040.h>
 
-STATIC const mp_obj_type_t mp_caninterface_type;
+STATIC const mp_obj_type_t mp_type_caninterface;
+
+typedef struct canbus_internal {
+    struct can2040 internal;
+    mp_obj_t * recv_queue;
+    mp_fun_1_t pop;
+    mp_fun_2_t push;
+} canbus_internal_t;
 
 typedef struct {
     mp_obj_base_t base;
-    queue_t recv_queue;
-    struct can2040 internal;
+    canbus_internal_t bus;
 } mp_obj_can_interface_t;
 
 // PRIVATE
 // TODO Trying to decide what the best way of initing the device and wether we want to support
 //      multiple interfaces or a more intelligent structuring of the code
-STATIC mp_obj_can_interface_t mp_can_obj_0 = {.internal.pio_num = 0};
+// STATIC mp_obj_can_interface_t mp_can_obj_0 = {.internal.pio_num = 0};
 
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 {
+    canbus_internal_t* bus = (canbus_internal_t*)cd; 
     if (notify == CAN2040_NOTIFY_RX)
     {
-        // add the msg to the queue
-        queue_try_add(&mp_can_obj_0.recv_queue, msg); 
+        // We shouldn't need to worry about packing because it is all multiples of 64.
+        // So no matter the architecture it will be on cache lines
+        // Also we probably don't need to care about an exception being thrown since 
+        // we don't set the flags which would cause the exception
+        bus->push(bus->recv_queue, mp_obj_new_bytes((byte*)msg, sizeof(struct can2040_msg)));
+        mp_printf(MICROPY_ERROR_PRINTER, "RX!!!!\n");
     }
     if (notify == CAN2040_NOTIFY_ERROR)
     {
@@ -36,15 +48,25 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 
 }
 
-static void PIOx_IRQHandler(void)
+static void can2040_internal_irq_handler(void)
 {
-    can2040_pio_irq_handler(&mp_can_obj_0.internal);
+    // lock the python internals while we run our irq to make sure we aren't interupted!
+    mp_sched_lock();
+    gc_lock();
+
+    // handle the irq
+    // TODO: how?
+    // can2040_pio_irq_handler(&mp_can_obj_0.internal);
+
+    // unlock in reverse order!
+    gc_unlock();
+    mp_sched_unlock();
 }
 
 STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     enum { ARG_bitrate, ARG_sysclock, ARG_gpiorx, ARG_gpiotx, ARG_pionum};
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_bitrate,  MP_ARG_REQUIRED | MP_ARG_INT,   {.u_int = 500000} },
+        { MP_QSTR_bitrate,  MP_ARG_INT,   {.u_int = 500000} },
         { MP_QSTR_sysclock, MP_ARG_INT,   {.u_int = 125000000} },
         { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 11} },
         { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 12} },
@@ -62,43 +84,72 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, con
     uint32_t sys_clock = args[ARG_sysclock].u_int;
     uint32_t bitrate = args[ARG_bitrate].u_int;
 
-    // setup queue and what the hell is the usb thing doing?
-    queue_init(&self->recv_queue, sizeof(struct can2040_msg), 10); // 10 messages should be enough during normal execution
-    // stdio_usb_init();
+    pio_hw_t * pio = pio_num == 0 ? pio0_hw : pio1_hw;
+    uint pio_irq = pio_num == 0 ? PIO0_IRQ_0 : PIO1_IRQ_0;
 
-    // Setup canbus
-    can2040_setup(&self->internal, pio_num);
-    can2040_callback_config(&self->internal, can2040_cb);
+    // Setup canbus internal structure
+    can2040_setup(&self->bus.internal, pio_num);
+    can2040_callback_config(&self->bus.internal, can2040_cb);
 
-    // Enable irqs
-    irq_set_exclusive_handler(PIO1_IRQ_0_IRQn, PIOx_IRQHandler);
-    irq_set_priority(PIO1_IRQ_0_IRQn, PICO_HIGHEST_IRQ_PRIORITY);
-    irq_set_enabled(PIO1_IRQ_0_IRQn, true);
+    // disable the irq while configuring it
+    irq_set_enabled(pio_irq, false);
+
+    // claim all the pio sm irqs
+    for (uint8_t i=0; i < 4; i ++) {
+        if (pio_sm_is_claimed(pio, i)) {
+            irq_set_enabled(pio_irq, true); // reenable since we don't own it
+            mp_raise_ValueError("StateMachine claimed by external resource!");
+        }
+        pio_sm_claim(pio, i);
+    }
+
+
+    irq_handler_t handler = irq_get_exclusive_handler(pio_irq);
+    if (handler != NULL) {
+        // this is the default MicroPython irq handler... hopefully
+        irq_remove_handler(pio_irq, handler);
+    }
+
+    // configure with our IRQ handler
+    irq_set_exclusive_handler(pio_irq, can2040_internal_irq_handler);
+    irq_set_priority(pio_irq, PICO_HIGHEST_IRQ_PRIORITY);
+    irq_set_enabled(pio_irq, true);
+
 
     // Start canbus
-    can2040_start(&self->internal, sys_clock, bitrate, gpio_rx, gpio_tx);
-
+    can2040_start(&self->bus.internal, sys_clock, bitrate, gpio_rx, gpio_tx);
     return mp_const_none;
 }
 
-STATIC mp_obj_t mp_can_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    return can_init_helper(MP_OBJ_TO_PTR(pos_args[0]), n_args - 1, pos_args + 1, kw_args);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mp_can_init_obj, 1 , mp_can_init);
+// STATIC mp_obj_t mp_can_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+//     mp_printf(MICROPY_ERROR_PRINTER, "in __init__\n");
+//     return can_init_helper(MP_OBJ_TO_PTR(pos_args[0]), n_args - 1, pos_args + 1, kw_args);
+// }
+// STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mp_can_init_obj, 1 , mp_can_init);
 
 STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
     // parse args
+    mp_printf(MICROPY_ERROR_PRINTER, "In can_make_new\n");
     mp_map_t kw_args;
     mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
 
     // setup the object
-    mp_obj_can_interface_t *self = &mp_can_obj_0;
-    self->base.type = &mp_caninterface_type;
+    mp_obj_can_interface_t *self = m_new_obj(mp_obj_can_interface_t);
+    self->base.type = &mp_type_caninterface;
+
+    // create a new deque and call it's make_new (__init__)
+    mp_obj_t deque_args[2] = {mp_const_empty_tuple, mp_obj_new_int(10)};
+    self->bus.recv_queue = MP_OBJ_TYPE_GET_SLOT(&mp_type_deque, make_new)(&mp_type_deque, 2, 0, deque_args);
+
+    mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
+    self->bus.pop = (mp_fun_1_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_popleft), MP_MAP_LOOKUP);
+    self->bus.push = (mp_fun_2_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_append), MP_MAP_LOOKUP);
+
 
     // Need to setup here and set the PIO interface
     can_init_helper(self, n_args, all_args, &kw_args);
 
-    return (mp_obj_t)self;
+    return MP_OBJ_FROM_PTR(self);
 }
 
 STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
@@ -136,7 +187,7 @@ STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, 
     //     mp_printf(MICROPY_ERROR_PRINTER, "%d\n", ((uint8_t*)data.buf)[i]);
     // }
 
-    can2040_transmit(&self->internal, &response);
+    can2040_transmit(&self->bus.internal, &response);
 
     return mp_const_none;
 }
@@ -149,7 +200,10 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
 
     struct can2040_msg msg;
 
-    queue_remove_blocking(&self->recv_queue, &msg);
+    mp_obj_t res = mp_call_function_1_protected(self->bus.pop,self->bus.recv_queue);
+    if (res == MP_OBJ_NULL) {
+        return MP_OBJ_NULL; // TODO: Do we want to keep waiting instead?
+    }
     
     mp_obj_t *items;
 
@@ -169,24 +223,23 @@ STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_recv_obj, 1 , mp_can_recv);
 
 STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&mp_can_init_obj) },
+    // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&mp_can_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&mp_can_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);
 
 STATIC MP_DEFINE_CONST_OBJ_TYPE(
-    mp_caninterface_type,
+    mp_type_caninterface,
     MP_QSTR_INTERFACE,
     MP_TYPE_FLAG_NONE,
     make_new, mp_can_make_new,
-    // print, ???,
     locals_dict, &canhack_caninterface_locals_dict
     );
 
 STATIC const mp_rom_map_elem_t can_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_canhack) },
-    { MP_ROM_QSTR(MP_QSTR_INTERFACE), MP_ROM_PTR(&mp_caninterface_type) },
+    { MP_ROM_QSTR(MP_QSTR_INTERFACE), MP_ROM_PTR(&mp_type_caninterface) },
 };
 STATIC MP_DEFINE_CONST_DICT(can_module_globals, can_module_globals_table);
 
