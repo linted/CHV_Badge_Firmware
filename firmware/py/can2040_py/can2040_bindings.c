@@ -7,6 +7,7 @@
 #include <RP2040.h>
 #include <pico/stdlib.h>
 #include <hardware/pio.h>
+#include <hardware/claim.h>
 #include <can2040.h>
 
 STATIC const mp_obj_type_t mp_type_caninterface;
@@ -26,7 +27,8 @@ typedef struct {
 // PRIVATE
 // TODO Trying to decide what the best way of initing the device and wether we want to support
 //      multiple interfaces or a more intelligent structuring of the code
-// STATIC mp_obj_can_interface_t mp_can_obj_0 = {.internal.pio_num = 0};
+STATIC mp_obj_can_interface_t *mp_can_obj_0;
+STATIC mp_obj_can_interface_t *mp_can_obj_1;
 
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
@@ -48,7 +50,7 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 
 }
 
-static void can2040_internal_irq_handler(void)
+static void can2040_internal_pio0_irq_handler(void)
 {
     // lock the python internals while we run our irq to make sure we aren't interupted!
     mp_sched_lock();
@@ -56,7 +58,22 @@ static void can2040_internal_irq_handler(void)
 
     // handle the irq
     // TODO: how?
-    // can2040_pio_irq_handler(&mp_can_obj_0.internal);
+    can2040_pio_irq_handler(&(mp_can_obj_0->bus.internal));
+
+    // unlock in reverse order!
+    gc_unlock();
+    mp_sched_unlock();
+}
+
+static void can2040_internal_pio1_irq_handler(void)
+{
+    // lock the python internals while we run our irq to make sure we aren't interupted!
+    mp_sched_lock();
+    gc_lock();
+
+    // handle the irq
+    // TODO: how?
+    can2040_pio_irq_handler(&(mp_can_obj_0->bus.internal));
 
     // unlock in reverse order!
     gc_unlock();
@@ -78,14 +95,22 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, con
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     uint32_t pio_num = args[ARG_pionum].u_int;
+    if ((pio_num != 0) && (pio_num != 1)) {
+        mp_raise_ValueError("Invalid PIO number. Must be 0 or 1");
+    }
+
     uint32_t gpio_rx = args[ARG_gpiorx].u_int;
     uint32_t gpio_tx = args[ARG_gpiotx].u_int;
-
     uint32_t sys_clock = args[ARG_sysclock].u_int;
     uint32_t bitrate = args[ARG_bitrate].u_int;
 
-    pio_hw_t * pio = pio_num == 0 ? pio0_hw : pio1_hw;
-    uint pio_irq = pio_num == 0 ? PIO0_IRQ_0 : PIO1_IRQ_0;
+    pio_hw_t * pio = (pio_num == 0) ? pio0_hw : pio1_hw;
+    uint pio_irq = (pio_num == 0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
+    if (pio_num == 0) {
+        mp_can_obj_0 = self;
+    } else {
+        mp_can_obj_1 = self;
+    }
 
     // Setup canbus internal structure
     can2040_setup(&self->bus.internal, pio_num);
@@ -111,14 +136,26 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, con
     }
 
     // configure with our IRQ handler
-    irq_set_exclusive_handler(pio_irq, can2040_internal_irq_handler);
+    
+    irq_set_exclusive_handler(pio_irq, 
+        (pio_num == 0) ? can2040_internal_pio0_irq_handler : can2040_internal_pio1_irq_handler);
     irq_set_priority(pio_irq, PICO_HIGHEST_IRQ_PRIORITY);
     irq_set_enabled(pio_irq, true);
 
 
+    // uint32_t save = hw_claim_lock();
+    // if (pio_can_add_program(pio, &prog)) {
+    //     pio_add_program(pio, &prog);
+    //     // mp_printf(MICROPY_ERROR_PRINTER, "Could insert program\n");
+    // } else {
+    //     mp_printf(MICROPY_ERROR_PRINTER, "Couldn't insert program\n");
+    // }
+    // hw_claim_unlock(save);
+
     // Start canbus
     can2040_start(&self->bus.internal, sys_clock, bitrate, gpio_rx, gpio_tx);
-    return mp_const_none;
+
+    return MP_OBJ_FROM_PTR(self);
 }
 
 // STATIC mp_obj_t mp_can_init(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
@@ -134,6 +171,7 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
     mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
 
     // setup the object
+    // TODO: change to use the global copy if it exists
     mp_obj_can_interface_t *self = m_new_obj(mp_obj_can_interface_t);
     self->base.type = &mp_type_caninterface;
 
