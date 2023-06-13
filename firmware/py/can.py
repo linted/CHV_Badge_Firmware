@@ -13,7 +13,8 @@ def safe_can_rx(rx_queue, rx_lock):
 
 def handle_canbus(rx_queue, tx_queue, rx_lock, tx_lock):
 
-    can2040_py.mp_can_init()
+    bus = canhack.INTERFACE()
+    bus.send(id=1, dlc=1, data=b'\x01')
 
     while (True):
         time.sleep(1)
