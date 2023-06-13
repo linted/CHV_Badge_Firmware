@@ -25,7 +25,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/firmware ${CMAKE_CURRENT_BINARY_DIR}/
 ## trash for letting other people extend their project. screw them.
 add_mpy_c_module(can2040_py 
     SRC ${CMAKE_CURRENT_LIST_DIR}/firmware/py/can2040_py/can2040_bindings.c 
-    DEPS can2040_interface)
+    DEPS hardware_claim can2040_interface)
 
 # Install the firmware so everything is in one nice folder
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/build/firmware.uf2

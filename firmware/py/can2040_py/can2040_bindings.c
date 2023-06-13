@@ -73,7 +73,7 @@ static void can2040_internal_pio1_irq_handler(void)
 
     // handle the irq
     // TODO: how?
-    can2040_pio_irq_handler(&(mp_can_obj_0->bus.internal));
+    can2040_pio_irq_handler(&(mp_can_obj_1->bus.internal));
 
     // unlock in reverse order!
     gc_unlock();
@@ -166,7 +166,6 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, con
 
 STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
     // parse args
-    mp_printf(MICROPY_ERROR_PRINTER, "In can_make_new\n");
     mp_map_t kw_args;
     mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
 

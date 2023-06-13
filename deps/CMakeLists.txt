@@ -8,7 +8,7 @@ add_library(
     can2040/src/can2040.c
 )
 target_include_directories(can2040 PUBLIC ${CMAKE_CURRENT_LIST_DIR}/can2040/src/)
-target_link_libraries(can2040 PUBLIC pico_stdlib cmsis_core)
+target_link_libraries(can2040 PUBLIC pico_stdlib hardware_pio cmsis_core)
 
 add_library(
     can2040_interface INTERFACE
