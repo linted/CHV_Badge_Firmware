@@ -12,6 +12,8 @@
 
 STATIC const mp_obj_type_t mp_type_caninterface;
 
+// We have this wrapper object for the internals for the same reason micropython does
+// We need to lie about it's type while smuggling additional variables in
 typedef struct canbus_internal {
     struct can2040 internal;
     mp_obj_t * recv_queue;
@@ -22,11 +24,10 @@ typedef struct canbus_internal {
 typedef struct {
     mp_obj_base_t base;
     canbus_internal_t bus;
+    bool started; // TODO: use this to see if start/stop should be NOPs
 } mp_obj_can_interface_t;
 
 // PRIVATE
-// TODO Trying to decide what the best way of initing the device and wether we want to support
-//      multiple interfaces or a more intelligent structuring of the code
 STATIC mp_obj_can_interface_t *mp_can_obj_0;
 STATIC mp_obj_can_interface_t *mp_can_obj_1;
 
@@ -80,29 +81,7 @@ static void can2040_internal_pio1_irq_handler(void)
     mp_sched_unlock();
 }
 
-STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum { ARG_bitrate, ARG_sysclock, ARG_gpiorx, ARG_gpiotx, ARG_pionum};
-    static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_bitrate,  MP_ARG_INT,   {.u_int = 500000} },
-        { MP_QSTR_sysclock, MP_ARG_INT,   {.u_int = 125000000} },
-        { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 11} },
-        { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 12} },
-        { MP_QSTR_pionum,   MP_ARG_INT,   {.u_int = 1}  },
-    };
-
-    // parse args
-    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-
-    uint32_t pio_num = args[ARG_pionum].u_int;
-    if ((pio_num != 0) && (pio_num != 1)) {
-        mp_raise_ValueError("Invalid PIO number. Must be 0 or 1");
-    }
-
-    uint32_t gpio_rx = args[ARG_gpiorx].u_int;
-    uint32_t gpio_tx = args[ARG_gpiotx].u_int;
-    uint32_t sys_clock = args[ARG_sysclock].u_int;
-    uint32_t bitrate = args[ARG_bitrate].u_int;
+STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, uint32_t gpio_rx , uint32_t gpio_tx, uint32_t sys_clock, uint32_t bitrate, uint32_t pio_num ) {
 
     pio_hw_t * pio = (pio_num == 0) ? pio0_hw : pio1_hw;
     uint pio_irq = (pio_num == 0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
@@ -142,16 +121,6 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, size_t n_args, con
     irq_set_priority(pio_irq, PICO_HIGHEST_IRQ_PRIORITY);
     irq_set_enabled(pio_irq, true);
 
-
-    // uint32_t save = hw_claim_lock();
-    // if (pio_can_add_program(pio, &prog)) {
-    //     pio_add_program(pio, &prog);
-    //     // mp_printf(MICROPY_ERROR_PRINTER, "Could insert program\n");
-    // } else {
-    //     mp_printf(MICROPY_ERROR_PRINTER, "Couldn't insert program\n");
-    // }
-    // hw_claim_unlock(save);
-
     // Start canbus
     can2040_start(&self->bus.internal, sys_clock, bitrate, gpio_rx, gpio_tx);
 
@@ -168,23 +137,58 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
     // parse args
     mp_map_t kw_args;
     mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
+    enum { ARG_bitrate, ARG_sysclock, ARG_gpiorx, ARG_gpiotx, ARG_pionum};
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_bitrate,  MP_ARG_INT,   {.u_int = 500000} },
+        { MP_QSTR_sysclock, MP_ARG_INT,   {.u_int = 125000000} },
+        { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 11} },
+        { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 12} },
+        { MP_QSTR_pionum,   MP_ARG_INT,   {.u_int = 1}  },
+    };
+
+    // parse args
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, all_args, &kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    uint32_t pio_num = args[ARG_pionum].u_int;
+    if ((pio_num != 0) && (pio_num != 1)) {
+        mp_raise_ValueError("Invalid PIO number. Must be 0 or 1");
+    }
+
+    uint32_t gpio_rx = args[ARG_gpiorx].u_int;
+    uint32_t gpio_tx = args[ARG_gpiotx].u_int;
+    uint32_t sys_clock = args[ARG_sysclock].u_int;
+    uint32_t bitrate = args[ARG_bitrate].u_int;
 
     // setup the object
-    // TODO: change to use the global copy if it exists
-    mp_obj_can_interface_t *self = m_new_obj(mp_obj_can_interface_t);
-    self->base.type = &mp_type_caninterface;
+    mp_obj_can_interface_t *self;
+    if ((pio_num == 0) && (mp_can_obj_0 != NULL)) {
+        self = mp_can_obj_0;
+    } else if ((pio_num == 1) && (mp_can_obj_1 != NULL)) {
+        self = mp_can_obj_1;
+    } else {
+        // create a new obj and save it for later
+        self = m_new_obj(mp_obj_can_interface_t);
+        self->base.type = &mp_type_caninterface;
+        if (pio_num == 0) {
+            mp_can_obj_0 = self;
+        } else {
+            mp_can_obj_1 = self;
+        }
 
-    // create a new deque and call it's make_new (__init__)
-    mp_obj_t deque_args[2] = {mp_const_empty_tuple, mp_obj_new_int(10)};
-    self->bus.recv_queue = MP_OBJ_TYPE_GET_SLOT(&mp_type_deque, make_new)(&mp_type_deque, 2, 0, deque_args);
+        // create a new deque and call it's make_new (__init__)
+        mp_obj_t deque_args[2] = {mp_const_empty_tuple, mp_obj_new_int(10)};
+        self->bus.recv_queue = MP_OBJ_TYPE_GET_SLOT(&mp_type_deque, make_new)(&mp_type_deque, 2, 0, deque_args);
 
-    mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
-    self->bus.pop = (mp_fun_1_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_popleft), MP_MAP_LOOKUP);
-    self->bus.push = (mp_fun_2_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_append), MP_MAP_LOOKUP);
+        // add direct function calls so that we don't need to do lookup every time we use them
+        mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
+        self->bus.pop = (mp_fun_1_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_popleft), MP_MAP_LOOKUP);
+        self->bus.push = (mp_fun_2_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_append), MP_MAP_LOOKUP);
+    }
 
 
     // Need to setup here and set the PIO interface
-    can_init_helper(self, n_args, all_args, &kw_args);
+    can_init_helper(self, gpio_rx, gpio_tx, sys_clock, bitrate, pio_num);
 
     return MP_OBJ_FROM_PTR(self);
 }
