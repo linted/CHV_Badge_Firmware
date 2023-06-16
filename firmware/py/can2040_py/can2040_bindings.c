@@ -1,6 +1,7 @@
 
 // Include MicroPython API.
 #include <py/runtime.h>
+#include <py/obj.h>
 #include <py/gc.h>
 
 
@@ -235,7 +236,7 @@ STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, 
 STATIC mp_obj_t mp_can_send(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     return mp_can_send_helper(MP_OBJ_TO_PTR(pos_args[0]), n_args - 1, pos_args + 1, kw_args);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mp_can_send_obj, 1 , mp_can_send);
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_send_obj, 1 , mp_can_send);
 
 STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
 
@@ -263,24 +264,37 @@ STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_recv_obj, 1 , mp_can_recv);
 
+
+
+
+STATIC mp_obj_t mp_can_stop(mp_obj_t self_in) {
+    mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
+
+    can2040_stop(&(self->bus.internal));
+
+    return MP_OBJ_NULL;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(canbus_stop_obj, mp_can_stop);
+
 STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&mp_can_init_obj) },
-    { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&mp_can_send_obj) },
+    { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&canbus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
+    { MP_ROM_QSTR(MP_QSTR_stop), MP_ROM_PTR(&canbus_stop_obj) }
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);
 
 STATIC MP_DEFINE_CONST_OBJ_TYPE(
     mp_type_caninterface,
-    MP_QSTR_INTERFACE,
+    MP_QSTR_canbus,
     MP_TYPE_FLAG_NONE,
     make_new, mp_can_make_new,
     locals_dict, &canhack_caninterface_locals_dict
     );
 
 STATIC const mp_rom_map_elem_t can_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_canhack) },
-    { MP_ROM_QSTR(MP_QSTR_INTERFACE), MP_ROM_PTR(&mp_type_caninterface) },
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_canbus) },
+    { MP_ROM_QSTR(MP_QSTR_bus), MP_ROM_PTR(&mp_type_caninterface) },
 };
 STATIC MP_DEFINE_CONST_DICT(can_module_globals, can_module_globals_table);
 
@@ -290,4 +304,4 @@ const mp_obj_module_t mp_module_canhack = {
 };
 
 // Register the module 'can' and make it available in Python
-MP_REGISTER_MODULE(MP_QSTR_canhack, mp_module_canhack);
+MP_REGISTER_MODULE(MP_QSTR_canbus, mp_module_canhack);
