@@ -2,74 +2,43 @@ import time
 import machine
 
 
-line4 = machine.Pin(3, machine.Pin.OUT)
-line3 = machine.Pin(4, machine.Pin.OUT)
-line2 = machine.Pin(5, machine.Pin.OUT)
-line1 = machine.Pin(6, machine.Pin.OUT)
+class leds() :
+    _leds = [
+        (True, False, None, None),
+        (False, True, None, None),
+        (None, True, False, None),
+        (None, False, True, None),
+        (False, None, True, None),
+        (None, None, False, True),
+        (None, False, None, True),
+        (False, None, None, True),
+        (True, None, False, None)
+    ]
 
+    _lines = [
+        machine.Pin(6, machine.Pin.OUT),
+        machine.Pin(5, machine.Pin.OUT),
+        machine.Pin(4, machine.Pin.OUT),
+        machine.Pin(3, machine.Pin.OUT),
+    ]
 
-# leds = [
-#     (True, False, None, None),
-#     (True, None, False, None),
-#     (True, None, None, False),
-#     (False, True, None, None),
-#     (None, True, False, None),
-#     (None, True, None, False),
-#     (False, None, True, None),
-#     (None, False, True, None),
-#     (None, None, True, False)
-# ]
+    def __init__(self) -> None:
+        self.count = 0
+        self.reverse = False
 
-leds = [
-    (True, False, None, None),
-    (False, True, None, None),
-    (None, True, False, None),
-    (None, False, True, None),
-    (False, None, True, None),
-    (None, None, False, True),
-    (None, False, None, True),
-    (False, None, None, True),
-    (True, None, False, None)
-]
-
-lines = [
-    line1,
-    line2,
-    line3,
-    line4,
-]
-
-def led_on(led):
-    if led > len(leds):
-        return False
-    for line in lines:
-        line.init(mode=machine.Pin.IN)
-    for state, lineNo in zip(leds[led], range(len(lines))):
-        if state == None:
-            continue
-        lines[lineNo].init(mode=machine.Pin.OUT)
-        if state is True:
-            lines[lineNo].high()
-        else:
-            lines[lineNo].low()  
-    return True
-
-def do_loop():
-    count = 0
-    while True:
-        print("Doing led: ",count)
-        for line in lines:
-            line.init(mode=machine.Pin.IN)
-
-        for state, lineNo in zip(leds[count], range(len(lines))):
+    def do_loop_step(self) -> None:
+        for state, lineNo in zip(self._leds[count], range(len(self._lines))):
             if state == None:
-                continue
-            lines[lineNo].init(mode=machine.Pin.OUT)
-            if state is True:
-                lines[lineNo].high()
+                self._lines[lineNo].init(mode=machine.Pin.IN)
             else:
-                lines[lineNo].low()
+                self._lines[lineNo].init(mode=machine.Pin.OUT)
+                if state is True:
+                    self._lines[lineNo].high()
+                else:
+                    self._lines[lineNo].low()
 
-        count = (count+1) % 9
-        # data_out.write(b"*Insert Can Bus data here*\n")
-        time.sleep(1)
+        if self.reverse:
+            count = (count-1) % len(self._leds)
+        else:
+            count = (count+1) % len(self._leds)
+
