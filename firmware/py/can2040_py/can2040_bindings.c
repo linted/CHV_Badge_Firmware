@@ -25,7 +25,12 @@ typedef struct canbus_internal {
 typedef struct {
     mp_obj_base_t base;
     canbus_internal_t bus;
-    bool started; // TODO: use this to see if start/stop should be NOPs
+    uint32_t sys_clock;
+    uint32_t bitrate;
+    uint32_t gpio_rx;
+    uint32_t gpio_tx;
+    uint32_t pio_num;
+    bool started;
 } mp_obj_can_interface_t;
 
 // PRIVATE
@@ -82,18 +87,13 @@ static void can2040_internal_pio1_irq_handler(void)
     mp_sched_unlock();
 }
 
-STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, uint32_t gpio_rx , uint32_t gpio_tx, uint32_t sys_clock, uint32_t bitrate, uint32_t pio_num ) {
+STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self ) {
 
-    pio_hw_t * pio = (pio_num == 0) ? pio0_hw : pio1_hw;
-    uint pio_irq = (pio_num == 0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
-    if (pio_num == 0) {
-        mp_can_obj_0 = self;
-    } else {
-        mp_can_obj_1 = self;
-    }
+    pio_hw_t * pio = (self->pio_num == 0) ? pio0_hw : pio1_hw;
+    uint pio_irq = (self->pio_num == 0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
 
     // Setup canbus internal structure
-    can2040_setup(&self->bus.internal, pio_num);
+    can2040_setup(&self->bus.internal, self->pio_num);
     can2040_callback_config(&self->bus.internal, can2040_cb);
 
     // disable the irq while configuring it
@@ -118,12 +118,14 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self, uint32_t gpio_rx ,
     // configure with our IRQ handler
     
     irq_set_exclusive_handler(pio_irq, 
-        (pio_num == 0) ? can2040_internal_pio0_irq_handler : can2040_internal_pio1_irq_handler);
+        (self->pio_num == 0) ? can2040_internal_pio0_irq_handler : can2040_internal_pio1_irq_handler);
     irq_set_priority(pio_irq, PICO_HIGHEST_IRQ_PRIORITY);
     irq_set_enabled(pio_irq, true);
 
     // Start canbus
-    can2040_start(&self->bus.internal, sys_clock, bitrate, gpio_rx, gpio_tx);
+    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx);
+    self->started = true;
+
 
     return MP_OBJ_FROM_PTR(self);
 }
@@ -156,11 +158,6 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         mp_raise_ValueError("Invalid PIO number. Must be 0 or 1");
     }
 
-    uint32_t gpio_rx = args[ARG_gpiorx].u_int;
-    uint32_t gpio_tx = args[ARG_gpiotx].u_int;
-    uint32_t sys_clock = args[ARG_sysclock].u_int;
-    uint32_t bitrate = args[ARG_bitrate].u_int;
-
     // setup the object
     mp_obj_can_interface_t *self;
     if ((pio_num == 0) && (mp_can_obj_0 != NULL)) {
@@ -185,11 +182,22 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
         self->bus.pop = (mp_fun_1_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_popleft), MP_MAP_LOOKUP);
         self->bus.push = (mp_fun_2_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_append), MP_MAP_LOOKUP);
+
+        self->gpio_rx = args[ARG_gpiorx].u_int;
+        self->gpio_tx = args[ARG_gpiotx].u_int;
+        self->sys_clock = args[ARG_sysclock].u_int;
+        self->bitrate = args[ARG_bitrate].u_int;
+        self->pio_num = pio_num;
+
+        if (pio_num == 0) {
+            mp_can_obj_0 = self;
+        } else {
+            mp_can_obj_1 = self;
+        }
+        
+        // Need to setup here and set the PIO interface
+        can_init_helper(self);
     }
-
-
-    // Need to setup here and set the PIO interface
-    can_init_helper(self, gpio_rx, gpio_tx, sys_clock, bitrate, pio_num);
 
     return MP_OBJ_FROM_PTR(self);
 }
@@ -206,6 +214,10 @@ STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, 
     // parse args
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    if (!self->started) {
+        mp_raise_ValueError("Canbus is stopped");
+    }
 
     struct can2040_msg response;
 
@@ -242,6 +254,10 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
 
     struct can2040_msg msg;
 
+    if (!self->started) {
+        mp_raise_ValueError("Canbus is stopped");
+    }
+
     mp_obj_t res = mp_call_function_1_protected(self->bus.pop,self->bus.recv_queue);
     if (res == MP_OBJ_NULL) {
         return MP_OBJ_NULL; // TODO: Do we want to keep waiting instead?
@@ -264,13 +280,25 @@ STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_recv_obj, 1 , mp_can_recv);
 
+STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
+    mp_obj_can_interface_t*self = self_in;
 
+    if (!self->started) {
+        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx);
+        self->started = true;
+    }
 
+    return MP_OBJ_NULL;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(canbus_start_obj, mp_can_start);
 
 STATIC mp_obj_t mp_can_stop(mp_obj_t self_in) {
-    mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
+    mp_obj_can_interface_t*self = self_in;
 
-    can2040_stop(&(self->bus.internal));
+    if (self->started) {
+        can2040_stop(&(self->bus.internal));
+        self->started = false;
+    }
 
     return MP_OBJ_NULL;
 }
@@ -280,7 +308,8 @@ STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&mp_can_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&canbus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
-    { MP_ROM_QSTR(MP_QSTR_stop), MP_ROM_PTR(&canbus_stop_obj) }
+    { MP_ROM_QSTR(MP_QSTR_stop), MP_ROM_PTR(&canbus_stop_obj) },
+    { MP_ROM_QSTR(MP_QSTR_start), MP_ROM_PTR(&canbus_start_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);
 
