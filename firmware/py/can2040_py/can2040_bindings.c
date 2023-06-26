@@ -281,28 +281,83 @@ STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_recv_obj, 1 , mp_can_recv);
 
 STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
-    mp_obj_can_interface_t*self = self_in;
+    mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (!self->started) {
         can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx);
         self->started = true;
     }
 
-    return MP_OBJ_NULL;
+    return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(canbus_start_obj, mp_can_start);
 
 STATIC mp_obj_t mp_can_stop(mp_obj_t self_in) {
-    mp_obj_can_interface_t*self = self_in;
+    mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (self->started) {
         can2040_stop(&(self->bus.internal));
         self->started = false;
     }
 
-    return MP_OBJ_NULL;
+    return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(canbus_stop_obj, mp_can_stop);
+
+STATIC mp_obj_t propertyclass_bitrate(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_int(self->bitrate);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_bitrate_obj, propertyclass_bitrate);
+
+STATIC mp_obj_t propertyclass_gpio_rx(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_int(self->gpio_rx);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_gpio_rx_obj, propertyclass_gpio_rx);
+
+STATIC mp_obj_t propertyclass_gpio_tx(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_int(self->gpio_tx);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_gpio_tx_obj, propertyclass_gpio_tx);
+
+STATIC mp_obj_t propertyclass_pio_num(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_int(self->pio_num);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_pio_num_obj, propertyclass_pio_num);
+
+STATIC mp_obj_t propertyclass_started(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_bool(self->started);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_started_obj, propertyclass_started);
+
+
+// TODO: figure out the properties part
+// STATIC void propertyclass_attr(mp_obj_t self, qstr attribute, mp_obj_t *destination) {
+
+//     if(attribute == MP_QSTR_bitrate) {
+//         destination[0] = propertyclass_bitrate(self);
+//     } else if (attribute == MP_QSTR_gpiorx) {
+//         destination[0] = propertyclass_gpio_rx(self);
+//     } else if (attribute == MP_QSTR_gpiotx) {
+//         destination[0] = propertyclass_gpio_tx(self);
+//     } else if (attribute == MP_QSTR_pionum) {
+//         destination[0] = propertyclass_pio_num(self);
+//     } else if (attribute == MP_QSTR_started) {
+//         destination[0] = propertyclass_started(self);
+//     } else if (attribute == MP_QSTR_send) {
+//         destination[0] = &canbus_send_obj;
+//     }
+// }
+
 
 STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&mp_can_init_obj) },
@@ -310,6 +365,11 @@ STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
     { MP_ROM_QSTR(MP_QSTR_stop), MP_ROM_PTR(&canbus_stop_obj) },
     { MP_ROM_QSTR(MP_QSTR_start), MP_ROM_PTR(&canbus_start_obj) },
+    { MP_ROM_QSTR(MP_QSTR_bitrate), MP_ROM_PTR(&propertyclass_bitrate_obj) },
+    { MP_ROM_QSTR(MP_QSTR_gpiorx), MP_ROM_PTR(&propertyclass_gpio_rx_obj) },
+    { MP_ROM_QSTR(MP_QSTR_gpiotx), MP_ROM_PTR(&propertyclass_gpio_tx_obj) },
+    { MP_ROM_QSTR(MP_QSTR_pionum), MP_ROM_PTR(&propertyclass_pio_num_obj) },
+    { MP_ROM_QSTR(MP_QSTR_started), MP_ROM_PTR(&propertyclass_started_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);
 
@@ -318,6 +378,7 @@ STATIC MP_DEFINE_CONST_OBJ_TYPE(
     MP_QSTR_canbus,
     MP_TYPE_FLAG_NONE,
     make_new, mp_can_make_new,
+    // attr, propertyclass_attr,
     locals_dict, &canhack_caninterface_locals_dict
     );
 
