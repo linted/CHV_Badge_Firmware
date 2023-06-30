@@ -50,7 +50,7 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
         bus->push(bus->recv_queue, mp_obj_new_bytes((byte*)msg, sizeof(struct can2040_msg)));
         mp_printf(MICROPY_ERROR_PRINTER, "RX!!!!\n");
     }
-    if (notify == CAN2040_NOTIFY_ERROR)
+    if (notify & CAN2040_NOTIFY_ERROR)
     {
         mp_printf(MICROPY_ERROR_PRINTER, "Error...\n");
     }
@@ -123,7 +123,7 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self ) {
     irq_set_enabled(pio_irq, true);
 
     // Start canbus
-    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx);
+    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, 10);
     self->started = true;
 
 
@@ -284,7 +284,7 @@ STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
     mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (!self->started) {
-        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx);
+        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, 10);
         self->started = true;
     }
 
@@ -339,6 +339,13 @@ STATIC mp_obj_t propertyclass_started(mp_obj_t self_in) {
 
 MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_started_obj, propertyclass_started);
 
+STATIC mp_obj_t propertyclass_state(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_int(self->bus.internal.report_state);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_state_obj, propertyclass_state);
+
 
 // TODO: figure out the properties part
 // STATIC void propertyclass_attr(mp_obj_t self, qstr attribute, mp_obj_t *destination) {
@@ -370,6 +377,7 @@ STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_gpiotx), MP_ROM_PTR(&propertyclass_gpio_tx_obj) },
     { MP_ROM_QSTR(MP_QSTR_pionum), MP_ROM_PTR(&propertyclass_pio_num_obj) },
     { MP_ROM_QSTR(MP_QSTR_started), MP_ROM_PTR(&propertyclass_started_obj) },
+    { MP_ROM_QSTR(MP_QSTR_state), MP_ROM_PTR(&propertyclass_state_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);
 
