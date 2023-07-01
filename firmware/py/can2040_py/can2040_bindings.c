@@ -3,12 +3,16 @@
 #include <py/runtime.h>
 #include <py/obj.h>
 #include <py/gc.h>
+#include <py/mphal.h>
 
 
+// rp2040 specifics
 #include <RP2040.h>
 #include <pico/stdlib.h>
 #include <hardware/pio.h>
 #include <hardware/claim.h>
+
+// non-micropython stuff
 #include <can2040.h>
 
 STATIC const mp_obj_type_t mp_type_caninterface;
@@ -30,6 +34,7 @@ typedef struct {
     uint32_t gpio_rx;
     uint32_t gpio_tx;
     uint32_t pio_num;
+    uint32_t max_retries;
     bool started;
 } mp_obj_can_interface_t;
 
@@ -123,7 +128,7 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self ) {
     irq_set_enabled(pio_irq, true);
 
     // Start canbus
-    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, 10);
+    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, self->max_retries);
     self->started = true;
 
 
@@ -140,13 +145,14 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
     // parse args
     mp_map_t kw_args;
     mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-    enum { ARG_bitrate, ARG_sysclock, ARG_gpiorx, ARG_gpiotx, ARG_pionum};
+    enum { ARG_bitrate, ARG_sysclock, ARG_gpiorx, ARG_gpiotx, ARG_pionum, ARG_max_retries};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_bitrate,  MP_ARG_INT,   {.u_int = 500000} },
         { MP_QSTR_sysclock, MP_ARG_INT,   {.u_int = 125000000} },
         { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 11} },
         { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 12} },
         { MP_QSTR_pionum,   MP_ARG_INT,   {.u_int = 1}  },
+        { MP_QSTR_max_retries, MP_ARG_INT,{.u_int = 1}  },
     };
 
     // parse args
@@ -188,6 +194,7 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         self->sys_clock = args[ARG_sysclock].u_int;
         self->bitrate = args[ARG_bitrate].u_int;
         self->pio_num = pio_num;
+        self->max_retries = args[ARG_max_retries].u_int;
 
         if (pio_num == 0) {
             mp_can_obj_0 = self;
@@ -250,7 +257,7 @@ STATIC mp_obj_t mp_can_send(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_send_obj, 1 , mp_can_send);
 
-STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args, bool block) {
 
     struct can2040_msg msg;
 
@@ -258,10 +265,15 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
         mp_raise_ValueError("Canbus is stopped");
     }
 
-    mp_obj_t res = mp_call_function_1_protected(self->bus.pop,self->bus.recv_queue);
-    if (res == MP_OBJ_NULL) {
-        return MP_OBJ_NULL; // TODO: Do we want to keep waiting instead?
-    }
+    mp_obj_t res;
+    do {
+        res = mp_call_function_1_protected(self->bus.pop,self->bus.recv_queue);
+        if ((res == MP_OBJ_NULL) && (!block)) {
+            return MP_OBJ_NULL;
+        } else {
+            mp_hal_delay_ms(1);
+        }
+    } while(res == MP_OBJ_NULL);
     
     mp_obj_t *items;
 
@@ -275,16 +287,23 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
     // Return the result
     return ret_obj;
 }
+
 STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    return mp_can_recv_helper(MP_OBJ_TO_PTR(pos_args[0]), n_args - 1, pos_args + 1, kw_args);
+    return mp_can_recv_helper(MP_OBJ_TO_PTR(pos_args[0]), n_args - 1, pos_args + 1, kw_args, true);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_recv_obj, 1 , mp_can_recv);
+
+STATIC mp_obj_t mp_can_try_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    return mp_can_recv_helper(MP_OBJ_TO_PTR(pos_args[0]), n_args - 1, pos_args + 1, kw_args, false);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(canbus_try_recv_obj, 1 , mp_can_try_recv);
+
 
 STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
     mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (!self->started) {
-        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, 10);
+        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, self->max_retries);
         self->started = true;
     }
 
@@ -304,67 +323,47 @@ STATIC mp_obj_t mp_can_stop(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(canbus_stop_obj, mp_can_stop);
 
-STATIC mp_obj_t propertyclass_bitrate(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_bitrate(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_int(self->bitrate);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_bitrate_obj, propertyclass_bitrate);
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_bitrate_obj, canbus_bitrate);
 
-STATIC mp_obj_t propertyclass_gpio_rx(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_gpio_rx(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_int(self->gpio_rx);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_gpio_rx_obj, propertyclass_gpio_rx);
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_gpio_rx_obj, canbus_gpio_rx);
 
-STATIC mp_obj_t propertyclass_gpio_tx(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_gpio_tx(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_int(self->gpio_tx);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_gpio_tx_obj, propertyclass_gpio_tx);
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_gpio_tx_obj, canbus_gpio_tx);
 
-STATIC mp_obj_t propertyclass_pio_num(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_pio_num(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_int(self->pio_num);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_pio_num_obj, propertyclass_pio_num);
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_pio_num_obj, canbus_pio_num);
 
-STATIC mp_obj_t propertyclass_started(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_started(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_bool(self->started);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_started_obj, propertyclass_started);
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_started_obj, canbus_started);
 
-STATIC mp_obj_t propertyclass_state(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_state(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_int(self->bus.internal.report_state);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(propertyclass_state_obj, propertyclass_state);
-
-
-// TODO: figure out the properties part
-// STATIC void propertyclass_attr(mp_obj_t self, qstr attribute, mp_obj_t *destination) {
-
-//     if(attribute == MP_QSTR_bitrate) {
-//         destination[0] = propertyclass_bitrate(self);
-//     } else if (attribute == MP_QSTR_gpiorx) {
-//         destination[0] = propertyclass_gpio_rx(self);
-//     } else if (attribute == MP_QSTR_gpiotx) {
-//         destination[0] = propertyclass_gpio_tx(self);
-//     } else if (attribute == MP_QSTR_pionum) {
-//         destination[0] = propertyclass_pio_num(self);
-//     } else if (attribute == MP_QSTR_started) {
-//         destination[0] = propertyclass_started(self);
-//     } else if (attribute == MP_QSTR_send) {
-//         destination[0] = &canbus_send_obj;
-//     }
-// }
-
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_state_obj, canbus_state);
 
 STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&mp_can_init_obj) },
@@ -372,12 +371,13 @@ STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_recv), MP_ROM_PTR(&canbus_recv_obj) },
     { MP_ROM_QSTR(MP_QSTR_stop), MP_ROM_PTR(&canbus_stop_obj) },
     { MP_ROM_QSTR(MP_QSTR_start), MP_ROM_PTR(&canbus_start_obj) },
-    { MP_ROM_QSTR(MP_QSTR_bitrate), MP_ROM_PTR(&propertyclass_bitrate_obj) },
-    { MP_ROM_QSTR(MP_QSTR_gpiorx), MP_ROM_PTR(&propertyclass_gpio_rx_obj) },
-    { MP_ROM_QSTR(MP_QSTR_gpiotx), MP_ROM_PTR(&propertyclass_gpio_tx_obj) },
-    { MP_ROM_QSTR(MP_QSTR_pionum), MP_ROM_PTR(&propertyclass_pio_num_obj) },
-    { MP_ROM_QSTR(MP_QSTR_started), MP_ROM_PTR(&propertyclass_started_obj) },
-    { MP_ROM_QSTR(MP_QSTR_state), MP_ROM_PTR(&propertyclass_state_obj) },
+    { MP_ROM_QSTR(MP_QSTR_bitrate), MP_ROM_PTR(&canbus_bitrate_obj) },
+    { MP_ROM_QSTR(MP_QSTR_gpiorx), MP_ROM_PTR(&canbus_gpio_rx_obj) },
+    { MP_ROM_QSTR(MP_QSTR_gpiotx), MP_ROM_PTR(&canbus_gpio_tx_obj) },
+    { MP_ROM_QSTR(MP_QSTR_pionum), MP_ROM_PTR(&canbus_pio_num_obj) },
+    { MP_ROM_QSTR(MP_QSTR_started), MP_ROM_PTR(&canbus_started_obj) },
+    { MP_ROM_QSTR(MP_QSTR_state), MP_ROM_PTR(&canbus_state_obj) },
+    { MP_ROM_QSTR(MP_QSTR_try_recv), MP_ROM_PTR(&canbus_try_recv_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);
 
@@ -386,7 +386,6 @@ STATIC MP_DEFINE_CONST_OBJ_TYPE(
     MP_QSTR_canbus,
     MP_TYPE_FLAG_NONE,
     make_new, mp_can_make_new,
-    // attr, propertyclass_attr,
     locals_dict, &canhack_caninterface_locals_dict
     );
 

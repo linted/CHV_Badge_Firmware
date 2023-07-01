@@ -17,14 +17,14 @@ def main():
     # start background thread
     _thread.start_new_thread(can.handle_canbus, (rx_msg_queue,tx_msg_queue,rx_lock,tx_lock))
 
-    count = 0
-    while True:
-        print(f"Led {count}")
+    # count = 0
+    # while True:
+    #     print(f"Led {count}")
 
-        leds.led_on(count)
+    #     leds.led_on(count)
 
-        count = (count+1) % 9
-        time.sleep(1)
+    #     count = (count+1) % 9
+    #     time.sleep(1)
 
 
 

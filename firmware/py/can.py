@@ -1,6 +1,7 @@
-import canhack
+import canbus
 import time
 import slcan
+from leds import leds
 
 def safe_can_tx(tx_queue, tx_lock, msg):
     with tx_lock:
@@ -13,9 +14,11 @@ def safe_can_rx(rx_queue, rx_lock):
 
 def handle_canbus(rx_queue, tx_queue, rx_lock, tx_lock):
 
-    bus = canhack.INTERFACE()
-    bus.send(id=1, dlc=1, data=b'\x01')
+    bus = canbus.bus()
+    led_handler = leds()
 
     while (True):
+        bus.send(id=1, dlc=1, data=b'\x01')
+        leds.do_loop_step()
         time.sleep(1)
 
