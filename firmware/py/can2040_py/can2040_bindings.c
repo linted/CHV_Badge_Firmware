@@ -279,10 +279,10 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
 
     mp_obj_t ret_obj = mp_obj_new_tuple(3, NULL);
     items = ((mp_obj_tuple_t *)MP_OBJ_TO_PTR(ret_obj))->items;
-    items[2] = mp_obj_new_bytes(msg.data, 8);
 
     items[0] = MP_OBJ_NEW_SMALL_INT(msg.id);
     items[1] = MP_OBJ_NEW_SMALL_INT(msg.dlc);
+    items[2] = mp_obj_new_bytes(msg.data, 8);
 
     // Return the result
     return ret_obj;
