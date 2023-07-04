@@ -152,7 +152,7 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         { MP_QSTR_gpiorx,   MP_ARG_INT,   {.u_int = 11} },
         { MP_QSTR_gpiotx,   MP_ARG_INT,   {.u_int = 12} },
         { MP_QSTR_pionum,   MP_ARG_INT,   {.u_int = 1}  },
-        { MP_QSTR_max_retries, MP_ARG_INT,{.u_int = 1}  },
+        { MP_QSTR_max_retries, MP_ARG_INT,{.u_int = 10}  },
     };
 
     // parse args
@@ -183,11 +183,27 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         // create a new deque and call it's make_new (__init__)
         mp_obj_t deque_args[2] = {mp_const_empty_tuple, mp_obj_new_int(10)};
         self->bus.recv_queue = MP_OBJ_TYPE_GET_SLOT(&mp_type_deque, make_new)(&mp_type_deque, 2, 0, deque_args);
+        if (self->bus.recv_queue == NULL) {
+            mp_raise_ValueError("Unable to allocate queue");
+        }
+
 
         // add direct function calls so that we don't need to do lookup every time we use them
-        mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
-        self->bus.pop = (mp_fun_1_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_popleft), MP_MAP_LOOKUP);
-        self->bus.push = (mp_fun_2_t)mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_append), MP_MAP_LOOKUP);
+        mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(&mp_type_deque, locals_dict)->map;
+        mp_map_elem_t * pop = mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_popleft), MP_MAP_LOOKUP);
+        if ((pop == NULL) || (pop->value == MP_OBJ_NULL)) {
+            mp_raise_ValueError("Unable to locate deque functions");
+        } else {
+            self->bus.pop = (mp_fun_1_t)pop->value;
+        }
+        mp_map_elem_t * push = mp_map_lookup(locals_map, MP_ROM_QSTR(MP_QSTR_append), MP_MAP_LOOKUP);
+        if ((push == NULL) || (push->value == MP_OBJ_NULL)) {
+            mp_raise_ValueError("Unable to locate deque functions");
+        }  else {
+            self->bus.push = (mp_fun_2_t)push->value;
+        }
+
+
 
         self->gpio_rx = args[ARG_gpiorx].u_int;
         self->gpio_tx = args[ARG_gpiotx].u_int;
@@ -261,7 +277,7 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
 
     struct can2040_msg msg;
 
-    if (!self->started) {
+    if ((!self->started) || (self->bus.pop == NULL)) {
         mp_raise_ValueError("Canbus is stopped");
     }
 
@@ -269,6 +285,7 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
     do {
         res = mp_call_function_1_protected(self->bus.pop,self->bus.recv_queue);
         if ((res == MP_OBJ_NULL) && (!block)) {
+            mp_raise_ValueError("Nothing to recv");
             return MP_OBJ_NULL;
         } else {
             mp_hal_delay_ms(1);

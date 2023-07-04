@@ -1,11 +1,11 @@
-import typing
+# import typing
 
 ##
 #   slcan_parse:
 #       Takes in msg which is a byte string in slcan format
 #       On success, returns tuple(type, id, dlc, msg) else None
 ##
-def slcan_parse(msg:bytes) -> typing.Optional(typing.Tuple[str, int, int, bytes]):
+def slcan_parse(msg:bytes):# -> typing.Optional[typing.Tuple[str, int, int, bytes]]:
     # Check if extended frame
     if msg[0] == 'T' or msg[0] == 'R':
         if len(msg) < 10:

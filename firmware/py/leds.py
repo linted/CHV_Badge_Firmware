@@ -27,7 +27,7 @@ class leds() :
         self.reverse = False
 
     def do_loop_step(self) -> None:
-        for state, lineNo in zip(self._leds[count], range(len(self._lines))):
+        for state, lineNo in zip(self._leds[self.count], range(len(self._lines))):
             if state == None:
                 self._lines[lineNo].init(mode=machine.Pin.IN)
             else:
@@ -38,7 +38,7 @@ class leds() :
                     self._lines[lineNo].low()
 
         if self.reverse:
-            count = (count-1) % len(self._leds)
+            self.count = (self.count-1) % len(self._leds)
         else:
-            count = (count+1) % len(self._leds)
+            self.count = (self.count+1) % len(self._leds)
 
