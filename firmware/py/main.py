@@ -14,10 +14,10 @@ Good luck!
 # That's bad practice and you should be ashamed.
 canbus = engine.can()
 
-# thread = _thread.start_new_thread(engine.handle_canbus, (canbus,))
+thread = _thread.start_new_thread(engine.handle_canbus, (canbus,))
 
-try:
-    while True:
-        time.sleep(10)
-except KeyboardInterrupt:
-    print(msg)
+# try:
+#     while True:
+#         time.sleep(10)
+# except KeyboardInterrupt:
+#     print(msg)

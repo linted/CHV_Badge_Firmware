@@ -33,34 +33,52 @@ class can():
         # except Exception:
         #     pass
 
-    def _recv(self) -> None:
+    def _recv(self):
         # there can only be 10 messages in the queue
         # when we get here. So if things are added 
         # while we are processing messages, we don't
         # want to get stuck forever
+        msgs = []
         for _ in range(10):
             # queue can't handle any more, 
             # why keep shoving stuff in?
-            if len(self.rx_queue) >= 20:
-                return
+            queue_len = len(self.rx_queue)
+            if queue_len >= 20 or queue_len == 0:
+                return msgs
             try:
                 res = self.bus.try_recv()
                 self.rx_queue.append(res)
+                msgs.append(res)
             except Exception:
-                return
+                return msgs
+        return msgs
 
 
 def handle_canbus(bus):
 
     led_handler = leds()
+    led_handler.speed = 10
 
+    counter = 0
     while (True):
+        counter += 1
         # send our message
-        bus.send(arbid=1, dlc=1, data=b'\x01')
         
         # shhh you don't see this
         bus._send()
-        bus._recv()
+        msgs = bus._recv()
+
+        for msg in msgs:
+            if msg[0] == 0x10 and msg[1] >= 1:
+                led_handler.speed = int.from_bytes(msg[2],'little')
+                bus.send(arbid=0x10 + 0x40, dlc=1, data=b'\x01')
+            elif msg[0] == 0x12 and msg[1] == 7:
+                if msg[2] == b'forward':
+                    led_handler.reverse = False
+                    bus.send(arbid=0x10 + 0x40, dlc=8, data=b'onwards!')
+                elif msg[2] == b'reverse':
+                    led_handler.reverse = True
+                    bus.send(arbid=0x10 + 0x40, dlc=8, data=b'retreat!')
 
         led_handler.do_loop_step()
         time.sleep(.01)
