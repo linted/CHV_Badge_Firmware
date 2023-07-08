@@ -52,8 +52,16 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
         // So no matter the architecture it will be on cache lines
         // Also we probably don't need to care about an exception being thrown since 
         // we don't set the flags which would cause the exception
-        bus->push(bus->recv_queue, mp_obj_new_bytes((byte*)msg, sizeof(struct can2040_msg)));
-        mp_printf(MICROPY_ERROR_PRINTER, "RX!!!!\n");
+        nlr_buf_t nlr;
+        if (nlr_push(&nlr) == 0) { // This setjumps
+            /*res = */mp_call_function_2(bus->push, bus->recv_queue, mp_obj_new_bytes((uint8_t*)msg, sizeof(struct can2040_msg)));
+            nlr_pop(); // this will longjump if exception
+            return;
+        } else { // enter here on exception
+            mp_obj_print_exception(&mp_plat_print, MP_OBJ_FROM_PTR(nlr.ret_val));
+            mp_printf(MICROPY_ERROR_PRINTER, "Can RX msg queue full\n");
+        }
+        // bus->push(bus->recv_queue, mp_obj_new_bytes((byte*)msg, sizeof(struct can2040_msg)));
     }
     if (notify & CAN2040_NOTIFY_ERROR)
     {
@@ -128,7 +136,7 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self ) {
     irq_set_enabled(pio_irq, true);
 
     // Start canbus
-    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, self->max_retries);
+    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx/* self->max_retries*/);
     self->started = true;
 
 
@@ -179,6 +187,8 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         } else {
             mp_can_obj_1 = self;
         }
+
+        if (self->)
 
         // create a new deque and call it's make_new (__init__)
         mp_obj_t deque_args[2] = {mp_const_empty_tuple, mp_obj_new_int(10)};
@@ -281,28 +291,48 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
         mp_raise_ValueError("Canbus is stopped");
     }
 
-    mp_obj_t res;
+    // mp_obj_t res;
+    bool contin = true;
     do {
-        res = mp_call_function_1_protected(self->bus.pop,self->bus.recv_queue);
-        if ((res == MP_OBJ_NULL) && (!block)) {
-            mp_raise_ValueError("Nothing to recv");
-            return MP_OBJ_NULL;
-        } else {
-            mp_hal_delay_ms(1);
+        // This is disgusting. Holy cow.
+        // Never do this in real life.
+        nlr_buf_t nlr;
+        if (nlr_push(&nlr) == 0) { // This setjumps
+            /*res = */mp_call_function_1(self->bus.pop,self->bus.recv_queue);
+            nlr_pop(); // this will longjump if exception
+            contin = false;
+        } else { // enter here on exception
+            if (!block) {
+                // mp_raise_ValueError("Nothing to recv");
+                return MP_OBJ_NULL;
+            } else {
+                mp_hal_delay_ms(1);
+            }
         }
-    } while(res == MP_OBJ_NULL);
+    } while(contin);
     
-    mp_obj_t *items;
+    // parse the message here
+    // mp_buffer_info_t data;
+    // mp_get_buffer_raise(res, &data, MP_BUFFER_READ);
+    // // memcpy(&msg, data.buf, data.len);
+    // for(int i = 0; i < data.len || i < 8; i++) {
+    //     ((uint8_t*)&msg)[i] = ((uint8_t*)data.buf)[i];
+    // }
 
-    mp_obj_t ret_obj = mp_obj_new_tuple(3, NULL);
-    items = ((mp_obj_tuple_t *)MP_OBJ_TO_PTR(ret_obj))->items;
+    msg.id = 0xff;
+    msg.dlc = 0x8;
+    msg.data32[0] = 0xc0ffee;
+    msg.data32[1] = 0xdeadbea7;
 
-    items[0] = MP_OBJ_NEW_SMALL_INT(msg.id);
-    items[1] = MP_OBJ_NEW_SMALL_INT(msg.dlc);
-    items[2] = mp_obj_new_bytes(msg.data, 8);
+    mp_obj_t ret = mp_obj_new_tuple(3, NULL);
+
+    mp_obj_tuple_t *tuple = MP_OBJ_TO_PTR(ret);
+    tuple->items[0] = MP_OBJ_NEW_SMALL_INT(msg.id);
+    tuple->items[1] = MP_OBJ_NEW_SMALL_INT(msg.dlc);
+    tuple->items[2] = mp_obj_new_bytes(msg.data, sizeof(msg.data));
 
     // Return the result
-    return ret_obj;
+    return ret;
 }
 
 STATIC mp_obj_t mp_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
@@ -320,7 +350,7 @@ STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
     mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (!self->started) {
-        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, self->max_retries);
+        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx/*, self->max_retries*/);
         self->started = true;
     }
 
