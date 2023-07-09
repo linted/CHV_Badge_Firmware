@@ -43,13 +43,14 @@ class can():
             # queue can't handle any more, 
             # why keep shoving stuff in?
             queue_len = len(self.rx_queue)
-            if queue_len >= 20 or queue_len == 0:
+            if queue_len >= 20:
                 return msgs
             try:
                 res = self.bus.try_recv()
                 self.rx_queue.append(res)
                 msgs.append(res)
-            except Exception:
+            except Exception as e:
+                print(e)
                 return msgs
         return msgs
 

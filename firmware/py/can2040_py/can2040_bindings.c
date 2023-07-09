@@ -1,3 +1,4 @@
+#include <string.h>
 
 // Include MicroPython API.
 #include <py/runtime.h>
@@ -45,23 +46,34 @@ STATIC mp_obj_can_interface_t *mp_can_obj_1;
 static void
 can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
 {
-    canbus_internal_t* bus = (canbus_internal_t*)cd; 
+    canbus_internal_t* bus = (canbus_internal_t*)cd;
     if (notify == CAN2040_NOTIFY_RX)
     {
         // We shouldn't need to worry about packing because it is all multiples of 64.
         // So no matter the architecture it will be on cache lines
         // Also we probably don't need to care about an exception being thrown since 
         // we don't set the flags which would cause the exception
+
+        if (msg == NULL) {
+            mp_printf(MICROPY_ERROR_PRINTER, "msg is null????\n");
+            return;
+        }
+
+        
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) { // This setjumps
-            /*res = */mp_call_function_2(bus->push, bus->recv_queue, mp_obj_new_bytes((uint8_t*)msg, sizeof(struct can2040_msg)));
+            mp_obj_t msg_bytes = mp_obj_new_bytes((uint8_t*)msg, sizeof(struct can2040_msg));
+            mp_call_function_2(
+                bus->push,
+                bus->recv_queue,
+                msg_bytes
+            );
             nlr_pop(); // this will longjump if exception
             return;
         } else { // enter here on exception
             mp_obj_print_exception(&mp_plat_print, MP_OBJ_FROM_PTR(nlr.ret_val));
-            mp_printf(MICROPY_ERROR_PRINTER, "Can RX msg queue full\n");
+            mp_printf(MICROPY_ERROR_PRINTER, "CAN RX msg queue full\n");
         }
-        // bus->push(bus->recv_queue, mp_obj_new_bytes((byte*)msg, sizeof(struct can2040_msg)));
     }
     if (notify & CAN2040_NOTIFY_ERROR)
     {
@@ -74,14 +86,14 @@ static void can2040_internal_pio0_irq_handler(void)
 {
     // lock the python internals while we run our irq to make sure we aren't interupted!
     mp_sched_lock();
-    gc_lock();
+    // gc_lock(); // Can't lock the garbage collector because we are allocating memory :(
 
     // handle the irq
     // TODO: how?
     can2040_pio_irq_handler(&(mp_can_obj_0->bus.internal));
 
     // unlock in reverse order!
-    gc_unlock();
+    // gc_unlock();
     mp_sched_unlock();
 }
 
@@ -89,14 +101,14 @@ static void can2040_internal_pio1_irq_handler(void)
 {
     // lock the python internals while we run our irq to make sure we aren't interupted!
     mp_sched_lock();
-    gc_lock();
+    // gc_lock(); // Can't lock the garbage collector because we are allocating memory :(
 
     // handle the irq
     // TODO: how?
     can2040_pio_irq_handler(&(mp_can_obj_1->bus.internal));
 
     // unlock in reverse order!
-    gc_unlock();
+    // gc_unlock();
     mp_sched_unlock();
 }
 
@@ -136,7 +148,7 @@ STATIC mp_obj_t can_init_helper(mp_obj_can_interface_t *self ) {
     irq_set_enabled(pio_irq, true);
 
     // Start canbus
-    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx/* self->max_retries*/);
+    can2040_start(&self->bus.internal, self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, self->max_retries);
     self->started = true;
 
 
@@ -187,8 +199,6 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
         } else {
             mp_can_obj_1 = self;
         }
-
-        if (self->)
 
         // create a new deque and call it's make_new (__init__)
         mp_obj_t deque_args[2] = {mp_const_empty_tuple, mp_obj_new_int(10)};
@@ -291,14 +301,14 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
         mp_raise_ValueError("Canbus is stopped");
     }
 
-    // mp_obj_t res;
+    mp_obj_t res;
     bool contin = true;
     do {
         // This is disgusting. Holy cow.
         // Never do this in real life.
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) { // This setjumps
-            /*res = */mp_call_function_1(self->bus.pop,self->bus.recv_queue);
+            res = mp_call_function_1(self->bus.pop,self->bus.recv_queue);
             nlr_pop(); // this will longjump if exception
             contin = false;
         } else { // enter here on exception
@@ -312,17 +322,13 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
     } while(contin);
     
     // parse the message here
-    // mp_buffer_info_t data;
-    // mp_get_buffer_raise(res, &data, MP_BUFFER_READ);
-    // // memcpy(&msg, data.buf, data.len);
+    mp_buffer_info_t data;
+    mp_get_buffer_raise(res, &data, MP_BUFFER_READ);
+    memcpy(&msg, data.buf, data.len);
     // for(int i = 0; i < data.len || i < 8; i++) {
-    //     ((uint8_t*)&msg)[i] = ((uint8_t*)data.buf)[i];
+        // ((uint8_t*)&msg)[i] = ((uint8_t*)data.buf)[i];
     // }
 
-    msg.id = 0xff;
-    msg.dlc = 0x8;
-    msg.data32[0] = 0xc0ffee;
-    msg.data32[1] = 0xdeadbea7;
 
     mp_obj_t ret = mp_obj_new_tuple(3, NULL);
 
@@ -350,7 +356,7 @@ STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
     mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (!self->started) {
-        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx/*, self->max_retries*/);
+        can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx, self->max_retries);
         self->started = true;
     }
 
