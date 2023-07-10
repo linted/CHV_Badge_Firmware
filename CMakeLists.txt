@@ -10,7 +10,7 @@ file(MAKE_DIRECTORY ${INSTALL_DIR})
 
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps ${CMAKE_CURRENT_BINARY_DIR}/usermod_deps)
-# add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/verification ${CMAKE_CURRENT_BINARY_DIR}/usermod_verification)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/verification ${CMAKE_CURRENT_BINARY_DIR}/usermod_verification)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/firmware ${CMAKE_CURRENT_BINARY_DIR}/usermod_firmware)
 
 
