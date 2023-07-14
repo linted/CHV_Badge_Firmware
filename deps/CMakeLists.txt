@@ -58,7 +58,7 @@ function(add_mpy_py TARGET FILE)
         ${TARGET} ALL
         DEPENDS ${output_file}
     )
-    install(FILES ${output_file} DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES ${output_file} DESTINATION ${CMAKE_INSTALL_PREFIX}/${ARGN})
 endfunction()
 
 
@@ -88,3 +88,20 @@ function(add_mpy_c_module TARGET)
     target_link_libraries(usermod INTERFACE ${TARGET})
 
 endfunction()
+
+########### MicroPython-lib stuff ###########
+set(usbd_dir ${CMAKE_CURRENT_LIST_DIR}/micropython-lib/micropython/usbd)
+set(usbd_srcs
+    ${usbd_dir}/cdc.py
+    ${usbd_dir}/device.py
+    ${usbd_dir}/hid.py
+    ${usbd_dir}/midi.py
+    ${usbd_dir}/utils.py
+    ${usbd_dir}/__init__.py
+)
+
+# install(FILES ${output_file} DESTINATION ${CMAKE_INSTALL_PREFIX}/${ARGN})
+foreach(X ${usbd_srcs})
+    get_filename_component(USBD_FILE ${X} NAME_WE)
+    add_mpy_py(${USBD_FILE} ${X} "usbd/")
+endforeach()
