@@ -265,7 +265,7 @@ STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, 
     struct can2040_msg response;
 
     if (args[ARG_extframe].u_bool == true) {
-        response.id = args[ARG_id].u_int & 0x1FFFFFFF;
+        response.id = (args[ARG_id].u_int & 0x1FFFFFFF) | CAN2040_ID_EFF;
     } else {
         response.id = args[ARG_id].u_int & 0x7FF;
     }
