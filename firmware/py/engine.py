@@ -2,6 +2,7 @@ import time
 import collections
 
 import canbus
+import slcan
 
 # import slcan
 from leds import leds
@@ -57,6 +58,7 @@ class can():
 
 def handle_canbus(bus):
 
+    output = slcan.slcan()
     led_handler = leds()
     led_handler.speed = 10
 
@@ -70,6 +72,7 @@ def handle_canbus(bus):
         msgs = bus._recv()
 
         for msg in msgs:
+            output.send(*msg)
             if msg[0] == 0x10 and msg[1] >= 1:
                 led_handler.speed = int.from_bytes(msg[2],'little')
                 bus.send(arbid=0x10 + 0x40, dlc=1, data=b'\x01')
