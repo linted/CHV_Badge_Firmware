@@ -1,6 +1,7 @@
 import _thread
 import engine
 import time
+import slcan
 
 msg = '''
 Car Hacking Village Main Badge Defcon 31
@@ -13,8 +14,9 @@ Good luck!
 # DO NOT ACCESS THESE FROM REAL CODE.
 # That's bad practice and you should be ashamed.
 canbus = engine.can()
+output = slcan.slcan()
 
-_thread.start_new_thread(engine.handle_canbus, (canbus,))
+_thread.start_new_thread(engine.handle_canbus, (canbus,output))
 
 try:
     while True:

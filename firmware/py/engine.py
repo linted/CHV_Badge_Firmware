@@ -51,14 +51,12 @@ class can():
                 self.rx_queue.append(res)
                 msgs.append(res)
             except Exception as e:
-                print(e)
+                # print(e)
                 return msgs
         return msgs
 
 
-def handle_canbus(bus):
-
-    output = slcan.slcan()
+def handle_canbus(bus,output):
     led_handler = leds()
     led_handler.speed = 10
 
