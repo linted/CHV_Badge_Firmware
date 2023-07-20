@@ -6,7 +6,7 @@ class slcan():
         self.dev = cdc_data().dev
 
     def send(self, msg_id:int, dlc:int, msg:bytes, remote:bool=False):
-        self.dev.write(self.format(msg_id, dlc, msg, remote) + b'\r\n')
+        self.dev.write(self.format(msg_id, dlc, msg, remote) + b'\r')
 
     ##
     #   slcan_parse:
