@@ -3,6 +3,7 @@
 add_mpy_py(slcan ${CMAKE_CURRENT_SOURCE_DIR}/slcan.py)
 add_mpy_py(leds ${CMAKE_CURRENT_SOURCE_DIR}/leds.py)
 add_mpy_py(engine ${CMAKE_CURRENT_SOURCE_DIR}/engine.py)
+add_mpy_py(usbd_cdc ${CMAKE_CURRENT_SOURCE_DIR}/usbd_cdc.py)
 
 # I'm tired of talking about why this is commented out
 # add_subdirectory(can2040_py)
