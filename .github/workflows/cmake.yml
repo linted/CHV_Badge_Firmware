@@ -49,6 +49,8 @@ jobs:
         with:
           name: Release Artifacts
           path: release/
+      - name: Tar release
+        run: tar czf release.tgz release/
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,4 +59,4 @@ jobs:
           gh release create "$tag" \
               --repo="$GITHUB_REPOSITORY" \
               --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
-              --generate-notes release/*
+              --generate-notes release.tgz
