@@ -2,6 +2,8 @@ name: CMake
 
 on:
   push:
+    tags:
+        - v*
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
@@ -31,8 +33,22 @@ jobs:
       # Build your program with the given configuration
       run: ${{github.workspace}}/build.sh
 
-    - name: Archive code coverage results
-      uses: actions/upload-artifact@v3
-      with:
-        name: Release Artifacts
-        path: release/
+  release:
+    name: Release pushed tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Get build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: Release Artifacts
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: |
+          gh release create "$tag" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
+              --generate-notes release/
