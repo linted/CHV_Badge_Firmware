@@ -4,10 +4,17 @@ on:
   push:
     tags:
       - v*
+  workflow_run:
+    workflows: ["Cmake"]
+    branches: [main]
+    types: 
+      - completed
+
 
 jobs:
   release:
     name: Release pushed tag
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-22.04
     needs: Cmake
     steps:
