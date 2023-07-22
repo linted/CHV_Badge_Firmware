@@ -30,3 +30,9 @@ jobs:
     - name: Build
       # Build your program with the given configuration
       run: ${{github.workspace}}/build.sh
+
+    - name: Archive code coverage results
+      uses: actions/upload-artifact@v3
+      with:
+        name: Release Artifacts
+        path: release/
