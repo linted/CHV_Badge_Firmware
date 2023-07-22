@@ -6,4 +6,4 @@
 	url = ../../micropython/micropython.git
 [submodule "deps/micropython-lib"]
 	path = deps/micropython-lib
-	url = git@github.com:linted/micropython-lib.git
+	url = ../../linted/micropython-lib.git
