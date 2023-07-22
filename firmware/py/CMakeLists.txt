@@ -11,9 +11,18 @@ add_mpy_py(usbd_cdc ${CMAKE_CURRENT_SOURCE_DIR}/usbd_cdc.py)
 
 install(
     FILES 
-        ${CMAKE_CURRENT_LIST_DIR}/install.sh 
-        ${CMAKE_CURRENT_SOURCE_DIR}/boot.py
         ${CMAKE_CURRENT_SOURCE_DIR}/main.py
     DESTINATION 
         ${CMAKE_INSTALL_PREFIX}
+)
+
+install (
+    FILES
+        ${CMAKE_CURRENT_LIST_DIR}/install.sh 
+    DESTINATION
+        ${CMAKE_INSTALL_PREFIX}
+    PERMISSIONS
+        OWNER_READ OWNER_WRITE OWNER_EXECUTE
+        GROUP_READ GROUP_EXECUTE
+        WORLD_READ WORLD_EXECUTE
 )

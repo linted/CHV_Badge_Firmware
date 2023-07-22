@@ -11,6 +11,7 @@ class can():
 
     def __init__(self) -> None:
         self.bus = canbus.bus()
+        self.error_count = 0
         self.rx_queue = collections.deque(tuple(), 20)
         self.tx_queue = collections.deque(tuple(), 20)
     
@@ -18,21 +19,27 @@ class can():
         self.tx_queue.append((arbid,dlc,data))
 
     def recv(self):# -> Tuple[int, int, bytes]:
-        return self.rx_queue.popleft()
+        try:
+            return self.rx_queue.popleft()
+        except IndexError:
+            return None
 
     # Don't call this. It doesn't exist.
     # Stop looking at it
     def _send(self) -> None:
+        if self.bus.retransmissions() > 200: # arbitrary number
+            # restart the bus to clear the message queue
+            self.bus.stop()
+            self.bus.start()
         try:
             msg = self.tx_queue.popleft()
         except Exception:
             return
         if msg == None:
             return
-        # try:
+
         self.bus.send(id=msg[0], dlc=msg[1], data=msg[2])
-        # except Exception:
-        #     pass
+        return msg
 
     def _recv(self):
         # there can only be 10 messages in the queue
@@ -66,10 +73,13 @@ def handle_canbus(bus,output):
         # send our message
         
         # shhh you don't see this
-        bus._send()
-        msgs = bus._recv()
+        msgs = []
+        msgs.append(bus._send())
+        msgs.extend(bus._recv())
 
         for msg in msgs:
+            if msg is None:
+                continue
             output.send(*msg)
             if msg[0] == 0x10 and msg[1] >= 1:
                 led_handler.speed = int.from_bytes(msg[2],'little')
