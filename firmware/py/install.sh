@@ -2,15 +2,29 @@
 
 echo "This is only tested to work on ubuntu!!!"
 
-RES=$(inotifywait -e create /media/$USER/ --format %f .)
+wait_for_file () {
+    echo "Waiting for $1"
+    while [ 1 ]; do
+        ls $1 1>/dev/null 2>&1 && break
+        sleep 0.5
+    done
+    echo "found $1"
+}
 
-cp firmware.uf2 /media/$USER/$RES/
+while [ 1 ]; do
+    # flash with micropython
+    echo "%%%% Connect badge and enter bootloader %%%%"
+    echo "press reset + bootsel and release reset first"
+    wait_for_file /media/$USER/RPI-RP2
+    cp firmware.uf2 /media/$USER/RPI-RP2/
 
-while tty=$(inotifywait -e create /dev --format %f .); do
-    if [[ $tty =~ 'tty.*' ]]; then
-        for files in *.py *.mpy ; do
-            ampy -p /dev/$tty put $file
-        done
-        break
-    fi
+    # flash with python code
+    wait_for_file /dev/ttyACM0
+    for files in *py usbd/ ; do
+        ampy -p /dev/ttyACM0 put $files
+    done
+
+    # reset to make sure everything worked
+    echo "##### PRESS RESET BUTTON #####"
+
 done
