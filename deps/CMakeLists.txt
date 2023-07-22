@@ -50,8 +50,9 @@ function(add_mpy_py TARGET FILE)
     set(output_file ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.mpy)
     add_custom_command(
         OUTPUT ${output_file}
+        COMMAND echo "REBUILDING ${FILE}"
         COMMAND ${MPY_CROSS} ${FILE} -o ${output_file}
-        DEPENDS mpy_cross
+        DEPENDS mpy_cross ${FILE}
     )
 
     add_custom_target(
