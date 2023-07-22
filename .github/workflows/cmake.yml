@@ -20,6 +20,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Get submodules
+      run: git submodule update --init
+
     - name: Install deps
       # Install all the deps we need to actually build this
       run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi python3-pyelftools
