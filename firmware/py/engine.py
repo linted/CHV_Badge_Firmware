@@ -1,15 +1,14 @@
 import time
 import collections
 
-import canbus
-import slcan
-
 # import slcan
+
 from leds import leds
 
 class can():
 
     def __init__(self) -> None:
+        import canbus # do the import here so it's hidden from engine's scope
         self.bus = canbus.bus()
         self.error_count = 0
         self.rx_queue = collections.deque(tuple(), 20)
@@ -70,10 +69,23 @@ def handle_canbus(bus,output):
     counter = 0
     while (True):
         counter += 1
-        # send our message
-        
-        # shhh you don't see this
         msgs = []
+
+        # check to see if there are messages from the host
+        host_msg = output.recv()
+        if host_msg != None:
+            if type(host_msg) == tuple:
+                msgs.append(host_msg)
+            elif host_msg is True:
+                bus.bus.start()
+            elif host_msg is False:
+                bus.bus.stop()
+            elif type(host_msg) == int:
+                bus.bus. 
+
+
+
+        # shhh you don't see this
         msgs.append(bus._send())
         msgs.extend(bus._recv())
 
