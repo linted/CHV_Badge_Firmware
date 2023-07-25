@@ -246,12 +246,13 @@ STATIC mp_obj_t mp_can_make_new(const mp_obj_type_t *type, size_t n_args, size_t
 }
 
 STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum { ARG_id, ARG_dlc, ARG_data, ARG_extframe};
+    enum { ARG_id, ARG_dlc, ARG_data, ARG_extframe, ARG_remote};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_id,       MP_ARG_REQUIRED | MP_ARG_INT,   {.u_int = 0} },
         { MP_QSTR_dlc,      MP_ARG_REQUIRED | MP_ARG_INT,   {.u_int = 0} },
         { MP_QSTR_data,     MP_ARG_REQUIRED | MP_ARG_OBJ,   {.u_obj = MP_OBJ_NULL} },
-        { MP_QSTR_extframe, MP_ARG_BOOL,                    {.u_bool = false} },
+        { MP_QSTR_extended, MP_ARG_BOOL,                    {.u_bool = false} },
+        { MP_QSTR_remote,   MP_ARG_BOOL,                    {.u_bool = false} },
     };
 
     // parse args
@@ -264,10 +265,15 @@ STATIC mp_obj_t mp_can_send_helper(mp_obj_can_interface_t *self, size_t n_args, 
 
     struct can2040_msg response;
 
-    if (args[ARG_extframe].u_bool == true) {
+    // if an extended frame
+    if (args[ARG_extframe].u_bool == true || args[ARG_id].u_int > 0x7ff) {
         response.id = (args[ARG_id].u_int & 0x1FFFFFFF) | CAN2040_ID_EFF;
     } else {
         response.id = args[ARG_id].u_int & 0x7FF;
+    }
+
+    if (args[ARG_remote].u_bool == true) {
+        response.id |= CAN2040_ID_RTR;
     }
 
     response.dlc = args[ARG_dlc].u_int & 0xFF;
@@ -330,12 +336,14 @@ STATIC mp_obj_t mp_can_recv_helper(mp_obj_can_interface_t *self, size_t n_args, 
     // }
 
 
-    mp_obj_t ret = mp_obj_new_tuple(3, NULL);
+    mp_obj_t ret = mp_obj_new_tuple(5, NULL);
 
     mp_obj_tuple_t *tuple = MP_OBJ_TO_PTR(ret);
-    tuple->items[0] = MP_OBJ_NEW_SMALL_INT(msg.id);
+    tuple->items[0] = MP_OBJ_NEW_SMALL_INT(msg.id & ~(CAN2040_ID_EFF | CAN2040_ID_RTR));
     tuple->items[1] = MP_OBJ_NEW_SMALL_INT(msg.dlc);
     tuple->items[2] = mp_obj_new_bytes(msg.data, sizeof(msg.data));
+    tuple->items[3] = mp_obj_new_bool(msg.id & CAN2040_ID_EFF);
+    tuple->items[4] = mp_obj_new_bool(msg.id & CAN2040_ID_RTR);
 
     // Return the result
     return ret;

@@ -14,8 +14,8 @@ class can():
         self.rx_queue = collections.deque(tuple(), 20)
         self.tx_queue = collections.deque(tuple(), 20)
     
-    def send(self, arbid:int, dlc:int, data:bytes) -> None:
-        self.tx_queue.append((arbid,dlc,data))
+    def send(self, arbid:int, dlc:int, data:bytes, extended=False, remote:bool=False) -> None:
+        self.tx_queue.append((arbid,dlc,data,extended, remote))
 
     def recv(self):# -> Tuple[int, int, bytes]:
         try:
@@ -37,7 +37,7 @@ class can():
         if msg == None:
             return
 
-        self.bus.send(id=msg[0], dlc=msg[1], data=msg[2])
+        self.bus.send(id=msg[0], dlc=msg[1], data=msg[2], extended=msg[3], remote=msg[4])
         return msg
 
     def _recv(self):
@@ -68,40 +68,45 @@ def handle_canbus(bus,output):
 
     counter = 0
     while (True):
-        counter += 1
-        msgs = []
+        try:
+            counter += 1
+            # check to see if there are messages from the host
+            host_msg = output.recv()
+            if host_msg != None:
+                if type(host_msg) == tuple:
+                    bus.send(*host_msg)
+                elif host_msg is True:
+                    bus.bus.start()
+                elif host_msg is False:
+                    bus.bus.stop()
+                # elif type(host_msg) == int:
+                #     bus.bus.bitrate(host_msg)
 
-        # check to see if there are messages from the host
-        host_msg = output.recv()
-        if host_msg != None:
-            if type(host_msg) == tuple:
-                msgs.append(host_msg)
-            elif host_msg is True:
-                bus.bus.start()
-            elif host_msg is False:
-                bus.bus.stop()
-            # elif type(host_msg) == int:
-            #     bus.bus.bitrate(host_msg)
+            # shhh you don't see this
+            msgs = []
+            msgs.append(bus._send())
+            msgs.extend(bus._recv())
 
-        # shhh you don't see this
-        msgs.append(bus._send())
-        msgs.extend(bus._recv())
+            for msg in msgs:
+                if msg is None:
+                    continue
+                output.send(*msg)
+                if msg[0] == 0x10 and msg[1] >= 1:
+                    led_handler.speed = int.from_bytes(msg[2],'little')
+                    bus.send(arbid=0x10 + 0x40, dlc=1, data=b'\x01')
+                elif msg[0] == 0x12 and msg[1] == 7:
+                    if msg[2] == b'forward':
+                        led_handler.reverse = False
+                        bus.send(arbid=0x10 + 0x40, dlc=8, data=b'onwards!')
+                    elif msg[2] == b'reverse':
+                        led_handler.reverse = True
+                        bus.send(arbid=0x10 + 0x40, dlc=8, data=b'retreat!')
 
-        for msg in msgs:
-            if msg is None:
-                continue
-            output.send(*msg)
-            if msg[0] == 0x10 and msg[1] >= 1:
-                led_handler.speed = int.from_bytes(msg[2],'little')
-                bus.send(arbid=0x10 + 0x40, dlc=1, data=b'\x01')
-            elif msg[0] == 0x12 and msg[1] == 7:
-                if msg[2] == b'forward':
-                    led_handler.reverse = False
-                    bus.send(arbid=0x10 + 0x40, dlc=8, data=b'onwards!')
-                elif msg[2] == b'reverse':
-                    led_handler.reverse = True
-                    bus.send(arbid=0x10 + 0x40, dlc=8, data=b'retreat!')
+            led_handler.do_loop_step()
+            time.sleep(.01)
+        except Exception as e:
+            print(e)
+            import _thread
+            _thread.exit()
 
-        led_handler.do_loop_step()
-        time.sleep(.01)
 
