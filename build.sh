@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 if [[ "${1,,}" == "clean" ]]; then 
   rm -rf build/ release/
@@ -36,7 +37,7 @@ pushd $(dirname -- "${BASH_SOURCE[0]}")
   pushd build
     # cmake .. -DCMAKE_INSTALL_PREFIX=$(pwd)/../release
     cmake ../deps/micropython/ports/rp2 "-DPICO_SDK_PATH_OVERRIDE=$(pwd)/../deps/micropython/lib/pico-sdk" "-DUSER_C_MODULES=$(realpath $(pwd)/../CMakeLists.txt)" -DCMAKE_INSTALL_PREFIX=$(realpath $(pwd)/../release) $USE_CCACHE
-    cmake --build . -j4
+    cmake --build . -j6 #-j1 -- V=1
     cmake --install . 
   popd
 popd

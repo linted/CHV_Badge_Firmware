@@ -16,11 +16,13 @@ while [ 1 ]; do
     echo "%%%% Connect badge and enter bootloader %%%%"
     echo "press reset + bootsel and release reset first"
     wait_for_file /media/$USER/RPI-RP2
+    echo "Flashing firmware"
     cp firmware.uf2 /media/$USER/RPI-RP2/
 
     # flash with python code
     wait_for_file /dev/ttyACM0
     for files in *py usbd/ ; do
+        echo "Flashing %files"
         ampy -p /dev/ttyACM0 put $files
     done
 

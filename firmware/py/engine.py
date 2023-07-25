@@ -80,10 +80,8 @@ def handle_canbus(bus,output):
                 bus.bus.start()
             elif host_msg is False:
                 bus.bus.stop()
-            elif type(host_msg) == int:
-                bus.bus. 
-
-
+            # elif type(host_msg) == int:
+            #     bus.bus.bitrate(host_msg)
 
         # shhh you don't see this
         msgs.append(bus._send())

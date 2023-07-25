@@ -26,9 +26,9 @@ class slcan():
 
     def recv(self): # -> Optional[int, bool, Tuple[int, int, bytes, bool]]
         raw_msg = self.dev.read(11, '\r')
-        if raw_msg == None:
+        if raw_msg == None or len(raw_msg) < 1:
             return None
-        elif raw_msg[-1] != ord('r'):
+        elif raw_msg[-1] != ord('\r'):
             # someone is sending stuff on the usb bus
             # that isn't slcan stuff
             # ... or we got caught in the middle of a transfer

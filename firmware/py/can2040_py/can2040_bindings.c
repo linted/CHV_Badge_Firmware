@@ -376,12 +376,20 @@ STATIC mp_obj_t mp_can_stop(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(canbus_stop_obj, mp_can_stop);
 
-STATIC mp_obj_t canbus_bitrate(mp_obj_t self_in) {
+STATIC mp_obj_t canbus_bitrate(mp_obj_t self_in, mp_obj_t new_bitrate_obj) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+    if (new_bitrate_obj != mp_const_none) {
+        mp_int_t new_bitrate;
+        if(mp_obj_get_int_maybe(new_bitrate_obj, &new_bitrate)) {
+            self->bitrate = new_bitrate;
+        } else {
+            // TODO: should we do something here?
+        }
+    }
     return mp_obj_new_int(self->bitrate);
 }
 
-MP_DEFINE_CONST_FUN_OBJ_1(canbus_bitrate_obj, canbus_bitrate);
+MP_DEFINE_CONST_FUN_OBJ_2(canbus_bitrate_obj, canbus_bitrate);
 
 STATIC mp_obj_t canbus_gpio_rx(mp_obj_t self_in) {
     mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
