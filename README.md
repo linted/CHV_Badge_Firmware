@@ -1,3 +1,4 @@
+[![CMake](https://github.com/linted/CHV_Badge_Firmware/actions/workflows/cmake.yml/badge.svg)](https://github.com/linted/CHV_Badge_Firmware/actions/workflows/cmake.yml)
 # CHV Car on a board
 This project is intended to provide firmware for emulating a car on a single PCB.
 

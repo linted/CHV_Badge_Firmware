@@ -5,11 +5,12 @@ def startup():
     import _thread
     import engine
     import slcan
-
     canbus = engine.can()
     output = slcan.slcan()
+    import time
+    time.sleep(3)
+    print("starting thread")
     _thread.start_new_thread(engine.handle_canbus, (canbus,output))
-
     return canbus
 
 canbus = startup()
@@ -17,7 +18,7 @@ del startup
 
 print('''
 Car Hacking Village Main Badge Defcon 31
-You can get started by sending and receiving can
+You can get started by sending and receiving CAN
 messages using the "canbus" variable.
 Good luck!
 ''')

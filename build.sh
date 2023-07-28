@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 if [[ "${1,,}" == "clean" ]]; then 
   rm -rf build/ release/
