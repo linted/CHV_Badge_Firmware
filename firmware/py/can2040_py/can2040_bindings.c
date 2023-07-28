@@ -356,6 +356,8 @@ STATIC mp_obj_t mp_can_start(mp_obj_t self_in) {
     mp_obj_can_interface_t*self = MP_OBJ_TO_PTR(self_in);
 
     if (!self->started) {
+        memset(&(self->bus.internal.stats), 0, sizeof(struct can2040_stats));
+
         can2040_start(&(self->bus.internal), self->sys_clock, self->bitrate, self->gpio_rx, self->gpio_tx);
         self->started = true;
     }
@@ -438,6 +440,18 @@ STATIC mp_obj_t canbus_retransmissions(mp_obj_t self_in) {
 
 MP_DEFINE_CONST_FUN_OBJ_1(canbus_retransmissions_obj, canbus_retransmissions);
 
+STATIC mp_obj_t canbus_errors(mp_obj_t self_in) {
+    mp_obj_can_interface_t *self = MP_OBJ_TO_PTR(self_in);
+
+    struct can2040_stats stats = {0};
+
+    can2040_get_statistics(&self->bus.internal, &stats);
+
+    return mp_obj_new_int(stats.parse_error);
+}
+
+MP_DEFINE_CONST_FUN_OBJ_1(canbus_errors_obj, canbus_errors);
+
 
 STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     // { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&mp_can_init_obj) },
@@ -452,6 +466,7 @@ STATIC const mp_rom_map_elem_t canhack_caninterface_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_started), MP_ROM_PTR(&canbus_started_obj) },
     { MP_ROM_QSTR(MP_QSTR_state), MP_ROM_PTR(&canbus_state_obj) },
     { MP_ROM_QSTR(MP_QSTR_retransmissions), MP_ROM_PTR(&canbus_retransmissions_obj)},
+    { MP_ROM_QSTR(MP_QSTR_errors), MP_ROM_PTR(&canbus_errors_obj)},
     { MP_ROM_QSTR(MP_QSTR_try_recv), MP_ROM_PTR(&canbus_try_recv_obj) },  
 };
 STATIC MP_DEFINE_CONST_DICT(canhack_caninterface_locals_dict, canhack_caninterface_locals_dict_table);

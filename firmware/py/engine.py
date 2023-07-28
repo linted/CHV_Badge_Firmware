@@ -1,5 +1,6 @@
 import time
 import collections
+import machine
 
 # import slcan
 
@@ -10,7 +11,6 @@ class can():
     def __init__(self) -> None:
         import canbus # do the import here so it's hidden from engine's scope
         self.bus = canbus.bus()
-        self.error_count = 0
         self.rx_queue = collections.deque(tuple(), 20)
         self.tx_queue = collections.deque(tuple(), 20)
     
@@ -25,8 +25,8 @@ class can():
 
     # Don't call this. It doesn't exist.
     # Stop looking at it
-    def _send(self) -> None:
-        if self.bus.retransmissions() > 200: # arbitrary number
+    def _send(self, counter) -> None:
+        if self.bus.retransmissions() > 200 or counter % 1000 == 0: # arbitrary number
             # restart the bus to clear the message queue
             self.bus.stop()
             self.bus.start()
@@ -80,11 +80,11 @@ def handle_canbus(bus,output):
                 bus.bus.start()
             elif host_msg is False:
                 bus.bus.stop()
-            # elif type(host_msg) == int:
-            #     bus.bus.bitrate(host_msg)
+            elif type(host_msg) == int:
+                bus.bus.bitrate(host_msg)
 
         # shhh you don't see this
-        msgs.append(bus._send())
+        msgs.append(bus._send(counter))
         msgs.extend(bus._recv())
 
         for msg in msgs:
