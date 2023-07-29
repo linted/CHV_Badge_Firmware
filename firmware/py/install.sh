@@ -1,7 +1,5 @@
 #!/bin/bash
 
-echo "This is only tested to work on ubuntu!!!"
-
 wait_for_file () {
     echo "Waiting for $1"
     while [ 1 ]; do
@@ -13,20 +11,22 @@ wait_for_file () {
 
 while [ 1 ]; do
     # flash with micropython
-    echo "%%%% Connect badge and enter bootloader %%%%"
+    echo -e "\033[100D%%%% Connect badge and enter bootloader %%%%"
     echo "press reset + bootsel and release reset first"
     wait_for_file /media/$USER/RPI-RP2
-    echo "Flashing firmware"
+    echo -en "\033[1A\033[100D                                                        "
+    echo -en "\033[1A\033[100DFlashing firmware                                       "
     cp firmware.uf2 /media/$USER/RPI-RP2/
 
     # flash with python code
     wait_for_file /dev/ttyACM0
     for files in *py usbd/ ; do
-        echo "Flashing %files"
+        echo -en "\033[100DFlashing $files                                            "
         ampy -p /dev/ttyACM0 put $files
     done
 
     # reset to make sure everything worked
-    echo "##### PRESS RESET BUTTON #####"
-
+    echo -en "\033[100D##### PRESS RESET BUTTON #####                                 "
+    sleep 5
+    echo -en '\033[100D                                       '
 done
