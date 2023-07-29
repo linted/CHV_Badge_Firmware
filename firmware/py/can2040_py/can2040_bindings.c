@@ -59,7 +59,6 @@ can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *msg)
             return;
         }
 
-        
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) { // This setjumps
             mp_obj_t msg_bytes = mp_obj_new_bytes((uint8_t*)msg, sizeof(struct can2040_msg));
@@ -488,7 +487,7 @@ STATIC MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 STATIC const mp_rom_map_elem_t can_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_canbus) },
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR__canbus) },
     { MP_ROM_QSTR(MP_QSTR_bus), MP_ROM_PTR(&mp_type_caninterface) },
 };
 STATIC MP_DEFINE_CONST_DICT(can_module_globals, can_module_globals_table);
@@ -499,4 +498,4 @@ const mp_obj_module_t mp_module_canhack = {
 };
 
 // Register the module 'can' and make it available in Python
-MP_REGISTER_MODULE(MP_QSTR_canbus, mp_module_canhack);
+MP_REGISTER_MODULE(MP_QSTR__canbus, mp_module_canhack);

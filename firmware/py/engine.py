@@ -1,16 +1,13 @@
 import time
 import collections
-import machine
-
-# import slcan
 
 from leds import leds
 
 class can():
 
     def __init__(self) -> None:
-        import canbus # do the import here so it's hidden from engine's scope
-        self.bus = canbus.bus()
+        import _canbus # do the import here so it's hidden from engine's scope
+        self.bus = _canbus.bus()
         self.rx_queue = collections.deque(tuple(), 20)
         self.tx_queue = collections.deque(tuple(), 20)
     
@@ -22,6 +19,13 @@ class can():
             return self.rx_queue.popleft()
         except IndexError:
             return None
+
+    def _send_report(self, arbid:int, dlc:int, data:bytes, extended=False, remote:bool=False) -> None:
+        self.send(arbid, dlc, data, extended, remote)
+        try:
+            self.rx_queue.append((arbid, dlc, data, extended, remote))
+        except Exception:
+            pass
 
     # Don't call this. It doesn't exist.
     # Stop looking at it
@@ -74,7 +78,7 @@ def handle_canbus(bus,output):
             host_msg = output.recv()
             if host_msg != None:
                 if type(host_msg) == tuple:
-                    bus.send(*host_msg)
+                    bus._send_report(*host_msg)
                 elif host_msg is True:
                     bus.bus.start()
                 elif host_msg is False:
@@ -84,7 +88,7 @@ def handle_canbus(bus,output):
 
             # shhh you don't see this
             msgs = []
-            msgs.append(bus._send())
+            msgs.append(bus._send(counter))
             msgs.extend(bus._recv())
 
             for msg in msgs:
@@ -93,14 +97,42 @@ def handle_canbus(bus,output):
                 output.send(*msg)
                 if msg[0] == 0x10 and msg[1] >= 1:
                     led_handler.speed = int.from_bytes(msg[2],'little')
-                    bus.send(arbid=0x10 + 0x40, dlc=1, data=b'\x01')
+                    bus._send_report(arbid=0x10 + 0x40, dlc=1, data=b'\x01')
                 elif msg[0] == 0x12 and msg[1] == 7:
                     if msg[2] == b'forward':
                         led_handler.reverse = False
-                        bus.send(arbid=0x10 + 0x40, dlc=8, data=b'onwards!')
+                        bus._send_report(arbid=0x10 + 0x40, dlc=8, data=b'onwards!')
                     elif msg[2] == b'reverse':
                         led_handler.reverse = True
-                        bus.send(arbid=0x10 + 0x40, dlc=8, data=b'retreat!')
+                        bus._send_report(arbid=0x10 + 0x40, dlc=8, data=b'retreat!')
+                elif msg[0] == 0x100 and (len(msg) >= 5 and msg[4] == True):
+                    if msg[1] == 8:
+                        if msg[2] == b'DC31CHV\xa9':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=8, data=b'flag{\xd7\n\xe6')
+                    elif msg[1] == 7:
+                        if msg[2] == b'\xe0\xb2\xa0_\xe0\xb2\xa0':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=7, data=b'\x97A\x90\r3\x84%')
+                    elif msg[1] == 6:
+                        if msg[2] == b'linted':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=6, data=b']t\x89B\xbe\xbc')
+                    elif msg[1] == 5:
+                        if msg[2] == str(15 << 175 + 3**3 // 10 <<3)[:5].encode():
+                            bus._send_report(arbid=0x100 + 0x40, dlc=5, data=b'}\xbcd\xc9(')
+                    elif msg[1] == 4:
+                        if msg[2] == b'\xa5100':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=4, data=b'\xf5\x91\x88\xb5')
+                    elif msg[1] == 3:
+                        if msg[2] == b'\xec\x9b\x83':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=3, data=b'E\x8dh')
+                    elif msg[1] == 2:
+                        if msg[2] == b'\xd9\xbc':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=2, data=b'!N')
+                    elif msg[1] == 1:
+                        if msg[2] == b'\xbe':
+                            bus._send_report(arbid=0x100 + 0x40, dlc=1, data=b'7')
+                    else:
+                        bus._send_report(arbid=0x100 + 0x40, dlc=1, data=b'}')
+
 
             led_handler.do_loop_step()
             time.sleep(.01)
