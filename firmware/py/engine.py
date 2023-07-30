@@ -111,25 +111,25 @@ def handle_canbus(bus,output):
                             bus._send_report(arbid=0x100 + 0x40, dlc=8, data=b'flag{\xd7\n\xe6')
                     elif msg[1] == 7:
                         if msg[2] == b'\xe0\xb2\xa0_\xe0\xb2\xa0':
-                            bus._send_report(arbid=0x100 + 0x40, dlc=7, data=b'\x97A\x90\r3\x84%')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=7, data=b'n0*;ozC')
                     elif msg[1] == 6:
                         if msg[2] == b'linted':
-                            bus._send_report(arbid=0x100 + 0x40, dlc=6, data=b']t\x89B\xbe\xbc')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=6, data=b'\k!X"U')
                     elif msg[1] == 5:
                         if msg[2] == str(15 << 175 + 3**3 // 10 <<3)[:5].encode():
-                            bus._send_report(arbid=0x100 + 0x40, dlc=5, data=b'}\xbcd\xc9(')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=5, data=b')du+4')
                     elif msg[1] == 4:
                         if msg[2] == b'\xa5100':
-                            bus._send_report(arbid=0x100 + 0x40, dlc=4, data=b'\xf5\x91\x88\xb5')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=4, data=b'6e0T')
                     elif msg[1] == 3:
                         if msg[2] == b'\xec\x9b\x83':
-                            bus._send_report(arbid=0x100 + 0x40, dlc=3, data=b'E\x8dh')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=3, data=b'Emd')
                     elif msg[1] == 2:
                         if msg[2] == b'\xd9\xbc':
-                            bus._send_report(arbid=0x100 + 0x40, dlc=2, data=b'!N')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=2, data=b'fl')
                     elif msg[1] == 1:
                         if msg[2] == b'\xbe':
-                            bus._send_report(arbid=0x100 + 0x40, dlc=1, data=b'7')
+                            bus._send_report(arbid=0x100 + 0x40, dlc=1, data=b'a')
                     else:
                         bus._send_report(arbid=0x100 + 0x40, dlc=1, data=b'}')
 
