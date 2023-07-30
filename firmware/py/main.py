@@ -19,6 +19,10 @@ del startup
 print('''
 Car Hacking Village Main Badge Defcon 31
 You can get started by sending and receiving CAN
-messages using the "canbus" variable.
-Good luck!
+messages in python using the "canbus" variable.
+
+You can also use the slcan interface by running
+# sudo slcand -o -s8 -t hw /dev/ttyACM1
+# sudo ip link set slcan0 up
+
 ''')

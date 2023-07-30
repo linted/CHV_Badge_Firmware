@@ -32,7 +32,9 @@ class slcan():
 
     def recv(self): # -> Optional[int, bool, Tuple[int, int, bytes, bool]]
         raw_msg = self.dev.read(27, '\r')
-        if raw_msg == None or len(raw_msg) < 1:
+        # check if we didn't get a real message.
+        # It's possible to get just a b'\r', so check <=1
+        if raw_msg == None or len(raw_msg) <= 1:
             return None
         elif raw_msg[-1] != ord('\r'):
             # someone is sending stuff on the usb bus
