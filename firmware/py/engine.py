@@ -3,8 +3,9 @@ import collections
 
 from leds import leds
 
-class can():
+RUN_ENGINE = True
 
+class can():
     def __init__(self) -> None:
         import _canbus # do the import here so it's hidden from engine's scope
         self.bus = _canbus.bus()
@@ -65,13 +66,16 @@ class can():
                 return msgs
         return msgs
 
+def stop_engine():
+    global RUN_ENGINE
+    RUN_ENGINE = False
 
 def handle_canbus(bus,output):
     led_handler = leds()
     led_handler.speed = 10
 
     counter = 0
-    while (True):
+    while (RUN_ENGINE):
         try:
             counter += 1
             # check to see if there are messages from the host
@@ -138,7 +142,10 @@ def handle_canbus(bus,output):
             time.sleep(.01)
         except Exception as e:
             print(e)
-            import _thread
-            _thread.exit()
+            global RUN_ENGINE
+            RUN_ENGINE = False
+    print("Engine Stalled")
+    import _thread
+    _thread.exit()
 
 
