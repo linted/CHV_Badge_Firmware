@@ -4,6 +4,7 @@ import collections
 from leds import leds
 
 RUN_ENGINE = True
+BE_QUIET_SILLY_ENGINE = False
 
 class can():
     def __init__(self) -> None:
@@ -70,6 +71,10 @@ def stop_engine():
     global RUN_ENGINE
     RUN_ENGINE = False
 
+def stop_random_traffic():
+    global BE_QUIET_SILLY_ENGINE
+    BE_QUIET_SILLY_ENGINE = True
+
 def handle_canbus(bus,output):
     led_handler = leds()
     led_handler.speed = 10
@@ -90,9 +95,10 @@ def handle_canbus(bus,output):
                 elif type(host_msg) == int:
                     bus.bus.bitrate(host_msg)
 
-            for i in bus.get_msg(counter):
-                output.send(*i)
-                bus._send_report(*i)
+            if not BE_QUIET_SILLY_ENGINE:
+                for i in bus.bus.get_msg(counter):
+                    output.send(*i)
+                    bus._send_report(*i)
 
             # shhh you don't see this
             msgs = []
