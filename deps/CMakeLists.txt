@@ -52,7 +52,7 @@ function(add_mpy_py TARGET FILE)
         OUTPUT ${output_file}
         COMMAND echo "BUILDING ${FILE}"
         COMMAND ${MPY_CROSS} ${FILE} -o ${output_file}
-        DEPENDS mpy_cross ${FILE}
+        DEPENDS mpy_cross ${FILE} ${MPY_CROSS} 
     )
 
     add_custom_target(
