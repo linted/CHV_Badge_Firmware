@@ -90,6 +90,10 @@ def handle_canbus(bus,output):
                 elif type(host_msg) == int:
                     bus.bus.bitrate(host_msg)
 
+            for i in bus.get_msg(counter):
+                output.send(*i)
+                bus._send_report(*i)
+
             # shhh you don't see this
             msgs = []
             msgs.append(bus._send(counter))
